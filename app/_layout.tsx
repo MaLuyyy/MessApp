@@ -24,12 +24,16 @@ export default function RootLayout() {
   const hasRedirected = useRef(false);
 
   useEffect(() => {
+    let isMounted = true;
+    
     // Reset redirect flag khi pathname thay đổi
     if (publicRoutes.includes(pathname)) {
       hasRedirected.current = false;
     }
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!isMounted) return;
+      
       console.log("onAuthStateChanged fired, user:", user?.uid);
 
       try {
@@ -46,6 +50,11 @@ export default function RootLayout() {
 
         console.log("Đã login, check Firestore...");
         
+        // Thêm delay nhỏ để đảm bảo auth state ổn định
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        if (!isMounted) return;
+        
         // Lấy user document từ Firestore
         const userDocRef = doc(db, "users", user.uid);
         let userDoc;
@@ -55,14 +64,17 @@ export default function RootLayout() {
           console.log("Firestore lấy xong:", userDoc.exists());
         } catch (firestoreError) {
           console.error("Lỗi Firestore:", firestoreError);
-          // Nếu lỗi Firestore, redirect về form_profile
+          // Nếu lỗi Firestore, vẫn redirect về form_profile để user có thể tạo profile
           if (!hasRedirected.current && pathname !== "/form_profile") {
             hasRedirected.current = true;
             console.log("Lỗi Firestore → /form_profile");
             router.replace("/form_profile");
           }
+          setCheckingAuth(false);
           return;
         }
+
+        if (!isMounted) return;
 
         if (!userDoc.exists()) {
           // Document không tồn tại
@@ -103,11 +115,14 @@ export default function RootLayout() {
           router.replace("/sign_in");
         }
       } finally {
-        setCheckingAuth(false);
+        if (isMounted) {
+          setCheckingAuth(false);
+        }
       }
     });
 
     return () => {
+      isMounted = false;
       unsubscribe();
     };
   }, [pathname, router]);

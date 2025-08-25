@@ -16,6 +16,7 @@ export default function SignIn(){
     const [password, setPassword] = useState("");
     const [biometricType, setBiometricType] = useState<null | 'finger' | 'face'>(null);
     const [biometricEnabled, setBiometricEnabled] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         const loadBiometricSetting = async () => {
@@ -80,32 +81,14 @@ export default function SignIn(){
     const handleSignIn = async (pass?: string) => {
         try {
             const user = await signIn(email, pass || password);
-            await AsyncStorage.setItem('savedEmail', email);
-            
-            // lấy user profile từ Firestore
-            const userDoc = await getDoc(doc(db, "users", user.uid));
-
-            if (!userDoc.exists()) {
-                // Nếu chưa có document => bắt điền form
-                return router.replace("/form_profile");
-            }
-            
-            const data = userDoc.data();
-            // ✅ Kiểm tra đủ thông tin chưa
-            if (!data?.username || !data?.fullname || !data?.numberphone || !data?.birthday) {
-                router.replace("/form_profile");
-            } else {
-                router.replace("/home");
-            }
+            await AsyncStorage.setItem('savedEmail', email);            
 
             Toast.show({
                 type: 'success',
                 text1: 'Đăng nhập thành công',
                 position: 'bottom',
-                visibilityTime: 3000, // (ms)
+                visibilityTime: 3000, 
             });
-            
-            router.replace('/home');
         } catch (error: any) {
             Alert.alert('Lỗi', error.message);
         }

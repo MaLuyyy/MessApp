@@ -43,12 +43,11 @@ export default function CreateAccountScreen() {
         Toast.show({
             type: 'success',
             text1: 'Đăng kí thành công',
-            position: 'bottom',
+            position: 'top',
             visibilityTime: 3000, // (ms)
             });
-            await auth.signOut();
             setTimeout(() => {
-                router.replace('/sign_in');
+                router.replace('/form_profile');
               }, 1000);
     } catch (error: any) {
       Alert.alert('Lỗi', error.message);
