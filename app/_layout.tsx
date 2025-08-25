@@ -10,12 +10,14 @@ import { doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState, useRef } from 'react';
 import { ActivityIndicator, Alert, BackHandler, View } from 'react-native';
 import { StackAnimationTypes } from 'react-native-screens';
+import { getStoredAuthState, clearAuthState } from '@/lib/authState';
+
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const pathname = usePathname();
   const router = useRouter();
-  const tabRoutes = ['home', 'notifi', 'setting'];
+  const tabRoutes = ['home', 'notifi', 'settings'];
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
@@ -31,6 +33,16 @@ export default function RootLayout() {
       hasRedirected.current = false;
     }
 
+    // Kiểm tra stored auth state trước
+    const checkStoredAuth = async () => {
+      const storedAuthState = await getStoredAuthState();
+      if (storedAuthState?.isLoggedIn) {
+        console.log("Found stored auth state, user should be logged in");
+      }
+    };
+    
+    checkStoredAuth();
+    
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!isMounted) return;
       
@@ -39,6 +51,7 @@ export default function RootLayout() {
       try {
         if (!user) {
           // User không đăng nhập
+          await clearAuthState();
           if (!hasRedirected.current && !publicRoutes.includes(pathname)) {
             hasRedirected.current = true;
             console.log("Chưa đăng nhập → /sign_in");
@@ -47,8 +60,6 @@ export default function RootLayout() {
           setCheckingAuth(false);
           return;
         }
-
-        console.log("Đã login, check Firestore...");
         
         // Thêm delay nhỏ để đảm bảo auth state ổn định
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -180,6 +191,7 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="home" />
+        <Stack.Screen name="settings"/>
         <Stack.Screen name="sign_in" />
         <Stack.Screen name="sign_up" />
         <Stack.Screen name="form_profile" />

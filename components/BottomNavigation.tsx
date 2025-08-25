@@ -20,7 +20,7 @@ export default function BottomNavigation() {
   const tabs = [
     { name: 'home', icon: 'home-outline' },
     { name: 'notifi', icon: 'notifications-outline' },
-    { name: 'setting', icon: 'settings-outline' },
+    { name: 'settings', icon: 'settings-outline' },
   ];
 
   const isActive = (route: string) => pathname === `/${route}`;

@@ -9,6 +9,7 @@ import { Alert, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from "r
 import Toast from 'react-native-toast-message';
 import InputField from '../components/InputField';
 import { db } from "../lib/firebaseConfig"; // db = getFirestore(app)
+import { saveAuthState } from "@/lib/authState";
 
 export default function SignIn(){
     const router = useRouter();
@@ -79,9 +80,19 @@ export default function SignIn(){
       };
 
     const handleSignIn = async (pass?: string) => {
+        if (loading) return;
         try {
-            const user = await signIn(email, pass || password);
-            await AsyncStorage.setItem('savedEmail', email);            
+            const user = await signIn(email, pass || password);      
+
+            // Lưu email và password để sử dụng cho biometric login
+            await AsyncStorage.setItem('savedEmail', email);
+            await AsyncStorage.setItem('savedPassword', pass || password);
+
+            // Lưu trạng thái đăng nhập
+            await saveAuthState({
+                uid: user.uid,
+                email: user.email,
+            });
 
             Toast.show({
                 type: 'success',
@@ -91,6 +102,8 @@ export default function SignIn(){
             });
         } catch (error: any) {
             Alert.alert('Lỗi', error.message);
+        }finally {
+            setLoading(false);
         }
     };
      
