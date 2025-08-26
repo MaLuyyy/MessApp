@@ -28,13 +28,13 @@ export default function SignIn(){
       }, []);
 
     useEffect(() => {
-        const loadSavedEmail = async () => {
-          const savedEmail = await AsyncStorage.getItem('savedEmail');
-          if (savedEmail) {
-            setEmail(savedEmail);
+        const loadSavedEmailForBio = async () => {
+          const savedEmailForBio = await AsyncStorage.getItem('savedEmailForBio');
+          if (savedEmailForBio) {
+            setEmail(savedEmailForBio);
           }
         };
-        loadSavedEmail();
+        loadSavedEmailForBio();
       }, []);    
 
     const handleBiometricLogin = async () => {
@@ -84,6 +84,7 @@ export default function SignIn(){
         try {
             const user = await signIn(email, pass || password);      
 
+            await AsyncStorage.setItem('savedEmailForBio', email);
             // Lưu email và password để sử dụng cho biometric login
             await AsyncStorage.setItem('savedEmail', email);
             await AsyncStorage.setItem('savedPassword', pass || password);
@@ -114,12 +115,12 @@ export default function SignIn(){
     });
     
     if (auth.success) {
-        const savedPassword = await AsyncStorage.getItem('savedPassword');
-        if (!savedPassword) {
+        const savedPasswordForBio = await AsyncStorage.getItem('savedPasswordForBio');
+        if (!savedPasswordForBio) {
         Alert.alert('Không tìm thấy mật khẩu, vui lòng đăng nhập thủ công');
         return;
         }
-        handleSignIn(savedPassword);
+        handleSignIn(savedPasswordForBio);
     }
     };
 
@@ -130,8 +131,8 @@ export default function SignIn(){
             const isEnrolled = await LocalAuthentication.isEnrolledAsync();
             if (!hasHardware || !isEnrolled) return; 
             // Ss
-            const savedEmail = await AsyncStorage.getItem('savedEmail');
-            if (!savedEmail || savedEmail !== email) {
+            const savedEmailForBio = await AsyncStorage.getItem('savedEmailForBio');
+            if (!savedEmailForBio || savedEmailForBio !== email) {
               setBiometricType(null);
               return;
             }
@@ -175,7 +176,7 @@ export default function SignIn(){
             
         </View>
         <TouchableOpacity style={styles.button} onPress={() => {
-            AsyncStorage.setItem('savedPassword', password);
+            AsyncStorage.setItem('savedPasswordForBio', password);
             handleSignIn();
             }}>
             <Text style={styles.buttonText}>ĐĂNG NHẬP</Text>

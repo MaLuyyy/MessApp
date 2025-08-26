@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, usePathname } from 'expo-router';
 import { StackAnimationTypes } from 'react-native-screens';
@@ -18,9 +18,9 @@ export default function BottomNavigation() {
   const currentIndexRef = useRef<number>(0);
 
   const tabs = [
-    { name: 'home', icon: 'home-outline' },
-    { name: 'notifi', icon: 'notifications-outline' },
-    { name: 'settings', icon: 'settings-outline' },
+    { name: 'home', icon: 'chatbubble', label: 'Đoạn chat' },
+    { name: 'notifi', icon: 'notifications', label: 'Thông báo' },
+    { name: 'settings', icon: 'settings', label: 'Cài đặt' },
   ];
 
   const isActive = (route: string) => pathname === `/${route}`;
@@ -49,19 +49,26 @@ export default function BottomNavigation() {
 
   return (
     <View style={styles.container}>
-      {tabs.map((tab, index) => (
-        <TouchableOpacity
-          key={tab.name}
-          onPress={() => handleNavigate(tab.name, index)}
-        >
-          <Ionicons
-            name={tab.icon as any}
-            size={25}
-            color={isActive(tab.name) ? '#fff' : '#aaa'}
-            style={isActive(tab.name) ? styles.activeIcon : undefined}
-          />
-        </TouchableOpacity>
-      ))}
+      {tabs.map((tab, index) => {
+        const active = isActive(tab.name);
+        return (
+          <TouchableOpacity
+            key={tab.name}
+            onPress={() => handleNavigate(tab.name, index)}
+            style={styles.tabItem}
+          >
+            <Ionicons
+              name={tab.icon as any}
+              size={25}
+              color={active ? '#1E90FF' : '#aaa'}
+              style={active ? styles.activeIcon : undefined}
+            />
+            <Text style={[styles.label, active && styles.activeLabel]}>
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 }
@@ -71,14 +78,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 10,
     borderTopColor: '#eee',
     borderTopWidth: 1,
-    backgroundColor: '#EEEEEE',
+    backgroundColor: '#fff',
   },
   activeIcon: {
-    backgroundColor: '#FDB813',
-    padding: 10,
+    color: '#1E90FF',
+    padding: 7,
     borderRadius: 25,
+  },
+  tabItem: {
+    alignItems: 'center',
+  },
+  label: {
+    fontSize: 12,
+    color: '#aaa',
+    marginTop: 4,
+  },
+  activeLabel: {
+    color: '#1E90FF',
+    fontWeight: '500',
   },
 });

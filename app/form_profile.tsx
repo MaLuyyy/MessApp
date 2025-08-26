@@ -1,11 +1,11 @@
 import InputField from "@/components/InputField";
 import { useRouter } from "expo-router";
-import { collection, doc, getDocs, query, setDoc, where, updateDoc } from "firebase/firestore";
-import { useState, useEffect } from "react";
+import { doc, setDoc } from "firebase/firestore";
+import { useEffect, useState } from "react";
 import { Alert, SafeAreaView, StyleSheet, Text, TouchableOpacity } from "react-native";
-import { auth, db } from "../lib/firebaseConfig";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import Toast from 'react-native-toast-message';
+import { auth, db } from "../lib/firebaseConfig";
 
 export default function FormInfoScreen(){
     const router = useRouter();
@@ -84,7 +84,7 @@ export default function FormInfoScreen(){
                     fullname,
                     numberphone,
                     birthday,
-                    updatedAt: new Date().toISOString()
+                    updatedAt: new Date(),
                 }, { merge: true });
 
                 Toast.show({

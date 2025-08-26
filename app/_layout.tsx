@@ -10,8 +10,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState, useRef } from 'react';
 import { ActivityIndicator, Alert, BackHandler, View } from 'react-native';
 import { StackAnimationTypes } from 'react-native-screens';
-import { getStoredAuthState, clearAuthState } from '@/lib/authState';
-
+import { getStoredAuthState, clearAuthState, saveAuthState } from '@/lib/authState';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -21,113 +20,87 @@ export default function RootLayout() {
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
+  
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [authInitialized, setAuthInitialized] = useState(false);
   const publicRoutes = ["/sign_in", "/sign_up", "/forget_pass"];
   const hasRedirected = useRef(false);
+  const isInitializing = useRef(true);
 
   useEffect(() => {
     let isMounted = true;
     
-    // Reset redirect flag khi pathname thay đổi
-    if (publicRoutes.includes(pathname)) {
-      hasRedirected.current = false;
-    }
-
-    // Kiểm tra stored auth state trước
-    const checkStoredAuth = async () => {
-      const storedAuthState = await getStoredAuthState();
-      if (storedAuthState?.isLoggedIn) {
-        console.log("Found stored auth state, user should be logged in");
+    // Đợi Firebase Auth khởi tạo và restore persistent state
+    const initializeAuth = async () => {
+      try {
+        console.log("=== INITIALIZING AUTH ===");
+        console.log("Current pathname:", pathname);
+        
+        // Đợi Firebase Auth restore từ AsyncStorage (nếu có)
+        // Firebase cần thời gian để restore persistent auth state
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+      } catch (error) {
+        console.error("Error initializing auth:", error);
+      } finally {
+        setAuthInitialized(true);
       }
     };
-    
-    checkStoredAuth();
-    
+
+    initializeAuth();
+
+    // Lắng nghe Firebase auth state changes
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!isMounted) return;
+      if (!isMounted || !authInitialized) return;
       
-      console.log("onAuthStateChanged fired, user:", user?.uid);
+      console.log("=== FIREBASE AUTH STATE CHANGED ===");
+      console.log("User:", user?.uid || "undefined");
+      console.log("Current pathname:", pathname);
+      console.log("Has redirected:", hasRedirected.current);
+      console.log("Is initializing:", isInitializing.current);
 
       try {
         if (!user) {
-          // User không đăng nhập
+          // Không có user đăng nhập
+          console.log("No user - clearing local auth state");
           await clearAuthState();
-          if (!hasRedirected.current && !publicRoutes.includes(pathname)) {
+          
+          // Chỉ redirect nếu không ở public routes và không đang trong quá trình khởi tạo
+          if (!publicRoutes.includes(pathname) && !hasRedirected.current && !isInitializing.current) {
             hasRedirected.current = true;
-            console.log("Chưa đăng nhập → /sign_in");
+            console.log("Redirecting to sign_in");
             router.replace("/sign_in");
           }
-          setCheckingAuth(false);
-          return;
-        }
-        
-        // Thêm delay nhỏ để đảm bảo auth state ổn định
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        if (!isMounted) return;
-        
-        // Lấy user document từ Firestore
-        const userDocRef = doc(db, "users", user.uid);
-        let userDoc;
-        
-        try {
-          userDoc = await getDoc(userDocRef);
-          console.log("Firestore lấy xong:", userDoc.exists());
-        } catch (firestoreError) {
-          console.error("Lỗi Firestore:", firestoreError);
-          // Nếu lỗi Firestore, vẫn redirect về form_profile để user có thể tạo profile
-          if (!hasRedirected.current && pathname !== "/form_profile") {
-            hasRedirected.current = true;
-            console.log("Lỗi Firestore → /form_profile");
-            router.replace("/form_profile");
-          }
-          setCheckingAuth(false);
           return;
         }
 
-        if (!isMounted) return;
+        // User đã đăng nhập
+        console.log("User authenticated:", user.uid);
+        
+        // Lưu/cập nhật auth state
+        await saveAuthState({
+          uid: user.uid,
+          email: user.email,
+        });
 
-        if (!userDoc.exists()) {
-          // Document không tồn tại
-          if (!hasRedirected.current && pathname !== "/form_profile") {
-            hasRedirected.current = true;
-            console.log("Không có document → /form_profile");
-            router.replace("/form_profile");
-          }
-        } else {
-          const data = userDoc.data();
-          
-          if (!data?.username || !data?.fullname || !data?.numberphone || !data?.birthday) {
-            // Thiếu profile
-            if (!hasRedirected.current && pathname !== "/form_profile") {
-              hasRedirected.current = true;
-              console.log("Thiếu profile → /form_profile");
-              router.replace("/form_profile");
-            }
-          } else {
-            // Đủ profile
-            if (!hasRedirected.current && (pathname === "/" || publicRoutes.includes(pathname))) {
-              hasRedirected.current = true;
-              console.log("Redirect → /home");
-              router.replace("/home");
-            }
-          }
-        }
+        console.log("Checking user profile...");
+        
+        // Kiểm tra user profile
+        await checkUserProfile(user, pathname, router, hasRedirected, isMounted);
+        
       } catch (error) {
-        console.error("Lỗi check auth:", error);
+        console.error("Error in auth state handler:", error);
         
-        // Nếu lỗi permissions và user đã đăng nhập, redirect về form_profile
-        if (user && !hasRedirected.current && pathname !== "/form_profile") {
+        // Nếu có lỗi và không phải đang khởi tạo, redirect về sign_in
+        if (!hasRedirected.current && !publicRoutes.includes(pathname) && !isInitializing.current) {
           hasRedirected.current = true;
-          console.log("Lỗi permissions → /form_profile");
-          router.replace("/form_profile");
-        } else if (!user && !hasRedirected.current && !publicRoutes.includes(pathname)) {
-          hasRedirected.current = true;
+          console.log("Error occurred, redirecting to sign_in");
           router.replace("/sign_in");
         }
       } finally {
         if (isMounted) {
           setCheckingAuth(false);
+          isInitializing.current = false;
         }
       }
     });
@@ -136,12 +109,19 @@ export default function RootLayout() {
       isMounted = false;
       unsubscribe();
     };
-  }, [pathname, router]);
+  }, [authInitialized]); // Chỉ depend on authInitialized
+
+  // Reset redirect flag khi chuyển sang public routes
+  useEffect(() => {
+    if (publicRoutes.includes(pathname)) {
+      console.log("On public route, resetting redirect flag");
+      hasRedirected.current = false;
+    }
+  }, [pathname]);
   
   useFocusEffect(
     React.useCallback(() => {
       const onBackPress = () => {
-        // Nếu đang ở tab home thì thoát app
         if (pathname === '/home') {
           Alert.alert(
             'Thoát ứng dụng',
@@ -151,11 +131,9 @@ export default function RootLayout() {
               { text: 'Thoát', onPress: () => BackHandler.exitApp() },
             ]
           );
-          return true; // chặn hành vi mặc định
+          return true;
         }
-
-        // Nếu ở tab khác -> chặn back về tab trước
-        return true; // chặn hoàn toàn
+        return true;
       };
 
       const backHandler = BackHandler.addEventListener(
@@ -166,8 +144,8 @@ export default function RootLayout() {
     }, [pathname])
   );
 
-  if (!loaded || checkingAuth) {
-    // Loading trong khi chờ kiểm tra auth
+  // Hiển thị loading khi đang check auth
+  if (!loaded || checkingAuth || !authInitialized) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" />
@@ -200,4 +178,66 @@ export default function RootLayout() {
       <StatusBar style="auto" />
     </ThemeProvider>
   );
+}
+
+// Helper function để check user profile
+async function checkUserProfile(
+  user: any,
+  pathname: string,
+  router: any,
+  hasRedirected: React.MutableRefObject<boolean>,
+  isMounted: boolean
+) {
+  if (!isMounted || hasRedirected.current) return;
+
+  try {
+    console.log("Checking user profile for:", user.uid);
+    
+    const userDocRef = doc(db, "users", user.uid);
+    const userDoc = await getDoc(userDocRef);
+    
+    if (!isMounted) return;
+
+    if (!userDoc.exists()) {
+      console.log("No user document - redirect to form_profile");
+      if (pathname !== "/form_profile") {
+        hasRedirected.current = true;
+        router.replace("/form_profile");
+      }
+      return;
+    }
+
+    const data = userDoc.data();
+    const requiredFields = ['username', 'fullname', 'numberphone', 'birthday'];
+    const missingFields = requiredFields.filter(field => !data?.[field]);
+    
+    if (missingFields.length > 0) {
+      console.log("Missing profile fields:", missingFields);
+      if (pathname !== "/form_profile") {
+        hasRedirected.current = true;
+        router.replace("/form_profile");
+      }
+      return;
+    }
+
+    // Profile complete - redirect to home if needed
+    if (pathname === "/" || pathname === "/sign_in" || pathname === "/sign_up") {
+      console.log("Profile complete - redirect to home");
+      hasRedirected.current = true;
+      router.replace("/home");
+    }
+    
+  } catch (error: any) {
+    console.error("Error checking user profile:", error);
+    
+    if (error.code === 'permission-denied') {
+      console.log("Permission denied - redirect to form_profile");
+      if (pathname !== "/form_profile") {
+        hasRedirected.current = true;
+        router.replace("/form_profile");
+      }
+    } else {
+      throw error; // Re-throw để handle ở level cao hơn
+    }
+  }
 }

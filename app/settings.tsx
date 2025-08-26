@@ -63,7 +63,7 @@ export default function SettingsScreen() {
         id: '1',
         title: 'Thông tin cá nhân',
         icon: <Ionicons name="person-outline" size={20} color="#8B8B8B" />,
-        onPress: () => console.log('Navigate to Account'),
+        onPress: () => router.replace('/profile'),
     },
     {
         id: '2',
@@ -107,7 +107,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#EEEEEE',
+    backgroundColor: '#fff',
     paddingTop: 50,
 },
   header: {
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     height:70,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FAF9F8',
+    backgroundColor: '#EEEEEE',
     padding: 17,
     borderRadius: 12,
     marginBottom: 12,
