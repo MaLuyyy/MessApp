@@ -10,7 +10,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import React, { useEffect, useState, useRef } from 'react';
 import { ActivityIndicator, Alert, BackHandler, View } from 'react-native';
 import { StackAnimationTypes } from 'react-native-screens';
-import { getStoredAuthState, clearAuthState, saveAuthState } from '@/lib/authState';
+import { clearAuthState, saveAuthState } from '@/lib/authState';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -21,43 +21,30 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
   
-  const [checkingAuth, setCheckingAuth] = useState(true);
-  const [authInitialized, setAuthInitialized] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const publicRoutes = ["/sign_in", "/sign_up", "/forget_pass"];
   const hasRedirected = useRef(false);
-  const isInitializing = useRef(true);
+  const authInitialized = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
     
-    // Đợi Firebase Auth khởi tạo và restore persistent state
-    const initializeAuth = async () => {
-      try {
-        console.log("=== INITIALIZING AUTH ===");
-        console.log("Current pathname:", pathname);
-        
-        // Đợi Firebase Auth restore từ AsyncStorage (nếu có)
-        // Firebase cần thời gian để restore persistent auth state
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-      } catch (error) {
-        console.error("Error initializing auth:", error);
-      } finally {
-        setAuthInitialized(true);
-      }
-    };
-
-    initializeAuth();
-
+    console.log("=== SETTING UP AUTH LISTENER ===");
+    
     // Lắng nghe Firebase auth state changes
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!isMounted || !authInitialized) return;
+      if (!isMounted) return;
       
-      console.log("=== FIREBASE AUTH STATE CHANGED ===");
-      console.log("User:", user?.uid || "undefined");
+      // Đánh dấu auth đã được khởi tạo
+      if (!authInitialized.current) {
+        authInitialized.current = true;
+        console.log("Auth initialized");
+      }
+      
+      console.log("=== AUTH STATE CHANGED ===");
+      console.log("User:", user?.uid || "null");
       console.log("Current pathname:", pathname);
       console.log("Has redirected:", hasRedirected.current);
-      console.log("Is initializing:", isInitializing.current);
 
       try {
         if (!user) {
@@ -65,42 +52,40 @@ export default function RootLayout() {
           console.log("No user - clearing local auth state");
           await clearAuthState();
           
-          // Chỉ redirect nếu không ở public routes và không đang trong quá trình khởi tạo
-          if (!publicRoutes.includes(pathname) && !hasRedirected.current && !isInitializing.current) {
+          // Chỉ redirect nếu không ở public routes
+          if (!publicRoutes.includes(pathname) && !hasRedirected.current) {
             hasRedirected.current = true;
             console.log("Redirecting to sign_in");
             router.replace("/sign_in");
           }
-          return;
+        } else {
+          // User đã đăng nhập
+          console.log("User authenticated:", user.uid);
+          
+          // Lưu auth state
+          await saveAuthState({
+            uid: user.uid,
+            email: user.email,
+          });
+
+          // Kiểm tra user profile
+          await checkUserProfile(user, pathname, router, hasRedirected, isMounted);
         }
-
-        // User đã đăng nhập
-        console.log("User authenticated:", user.uid);
-        
-        // Lưu/cập nhật auth state
-        await saveAuthState({
-          uid: user.uid,
-          email: user.email,
-        });
-
-        console.log("Checking user profile...");
-        
-        // Kiểm tra user profile
-        await checkUserProfile(user, pathname, router, hasRedirected, isMounted);
         
       } catch (error) {
         console.error("Error in auth state handler:", error);
         
-        // Nếu có lỗi và không phải đang khởi tạo, redirect về sign_in
-        if (!hasRedirected.current && !publicRoutes.includes(pathname) && !isInitializing.current) {
+        // Nếu có lỗi, redirect về sign_in
+        if (!hasRedirected.current && !publicRoutes.includes(pathname)) {
           hasRedirected.current = true;
           console.log("Error occurred, redirecting to sign_in");
           router.replace("/sign_in");
         }
       } finally {
-        if (isMounted) {
-          setCheckingAuth(false);
-          isInitializing.current = false;
+        // QUAN TRỌNG: Set loading = false sau khi xử lý xong
+        if (isMounted && authInitialized.current) {
+          console.log("Setting loading to false");
+          setIsLoading(false);
         }
       }
     });
@@ -109,7 +94,7 @@ export default function RootLayout() {
       isMounted = false;
       unsubscribe();
     };
-  }, [authInitialized]); // Chỉ depend on authInitialized
+  }, []); // Chỉ chạy 1 lần khi component mount
 
   // Reset redirect flag khi chuyển sang public routes
   useEffect(() => {
@@ -133,7 +118,7 @@ export default function RootLayout() {
           );
           return true;
         }
-        return true;
+        return false; // Cho phép back bình thường cho các screen khác
       };
 
       const backHandler = BackHandler.addEventListener(
@@ -144,14 +129,17 @@ export default function RootLayout() {
     }, [pathname])
   );
 
-  // Hiển thị loading khi đang check auth
-  if (!loaded || checkingAuth || !authInitialized) {
+  // Hiển thị loading khi fonts chưa load hoặc đang check auth
+  if (!loaded || isLoading) {
+    console.log("Showing loading screen - loaded:", loaded, "isLoading:", isLoading);
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" />
       </View>
     );
   }
+
+  console.log("Rendering main app - pathname:", pathname);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
@@ -237,7 +225,7 @@ async function checkUserProfile(
         router.replace("/form_profile");
       }
     } else {
-      throw error; // Re-throw để handle ở level cao hơn
+      throw error;
     }
   }
 }

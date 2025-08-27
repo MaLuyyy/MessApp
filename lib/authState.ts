@@ -115,14 +115,13 @@ export const updateLastLoginTime = async () => {
 export const performLogout = async () => {
   try {
     console.log('Performing logout...');
-    
     // Đăng xuất từ Firebase
     await signOut(auth);
-    
+    await new Promise(resolve => setTimeout(resolve, 100));
     // Xóa tất cả auth state
     await clearAuthState();
     
-    console.log('Logged out successfully');
+    console.log('=== LOGOUT COMPLETED ===');
   } catch (error) {
     console.error('Error during logout:', error);
     // Vẫn clear local state ngay cả khi Firebase logout failed

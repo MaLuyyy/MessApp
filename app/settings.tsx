@@ -48,6 +48,7 @@ export default function SettingsScreen() {
                     text: 'Đăng xuất', 
                     onPress: async () => {
                         try {
+                          console.log('Starting logout process...');
                             await performLogout();
                             router.replace('/sign_in');
                         } catch (error) {
