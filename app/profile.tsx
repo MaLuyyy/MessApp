@@ -1,11 +1,9 @@
+import { getCurrentUserData } from "@/services/firestoreService";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { TouchableOpacity, View, Text, Image, StyleSheet } from "react-native";
-import { auth, db } from "@/lib/firebaseConfig";
-import { doc, getDoc } from "firebase/firestore";
-import React, { useEffect, useState, useRef  } from "react";
 import * as ImagePicker from "expo-image-picker";
-import { Alert } from "react-native";
+import { useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import ActionSheet from "react-native-actionsheet";
 
 export default function ProfileScreen(){
@@ -13,6 +11,7 @@ export default function ProfileScreen(){
     const [userData, setUserData] = useState<any>(null);
     const actionSheetRef = useRef<ActionSheet>(null);
     const [image, setImage] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
 
 
     const pickFromCamera = async () => {
@@ -34,26 +33,43 @@ export default function ProfileScreen(){
         });
         if (!result.canceled) setImage(result.assets[0].uri);
       };
-    useEffect(() => {
-        const fetchUser = async () => {
-          try {
-            const user = auth.currentUser;
-            if (!user) return;
-    
-            const ref = doc(db, "users", user.uid);
-            const snap = await getDoc(ref);
-    
-            if (snap.exists()) {
-              setUserData(snap.data());
+      const fetchUserData = async () => {
+        try {
+            setLoading(true);
+            
+            console.log("🔍 Fetching current user data...");
+            
+            const userData = await getCurrentUserData();
+            
+            if (userData) {
+                console.log("✅ Got user data:", userData);
+                setUserData(userData);
+            } else {
+                console.log("❌ User document not found");
+                Alert.alert('Lỗi', 'Không tìm thấy thông tin người dùng');
             }
-          } catch (err) {
-            console.log("Lỗi lấy user:", err);
-          }
-        };
-    
-        fetchUser();
-      }, []);
+
+        } catch (error) {
+            console.error("❌ Error fetching user data:", error);
+            const errorMessage = error instanceof Error ? error.message : 'Không thể tải thông tin người dùng';
+            Alert.alert('Lỗi', errorMessage);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchUserData();
+    }, []);
       
+    if (loading) {
+      return (
+          <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+              <Text>Đang tải...</Text>
+          </View>
+      );
+    }
+
     return(
         <View style={styles.container}>
           <View style={styles.header}>

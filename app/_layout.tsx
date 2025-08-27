@@ -25,65 +25,78 @@ export default function RootLayout() {
   const publicRoutes = ["/sign_in", "/sign_up", "/forget_pass"];
   const hasRedirected = useRef(false);
   const authInitialized = useRef(false);
+  const authUnsubscribe = useRef<(() => void) | null>(null);
+
+  // Reset redirect flag when changing routes
+  useEffect(() => {
+    console.log("Route changed to:", pathname);
+    if (publicRoutes.includes(pathname)) {
+      console.log("On public route, resetting redirect flag");
+      hasRedirected.current = false;
+    }
+  }, [pathname]);
 
   useEffect(() => {
     let isMounted = true;
     
     console.log("=== SETTING UP AUTH LISTENER ===");
     
-    // Lắng nghe Firebase auth state changes
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    // Clear any existing listener
+    if (authUnsubscribe.current) {
+      authUnsubscribe.current();
+    }
+    
+    // Setup Firebase auth state listener
+    authUnsubscribe.current = onAuthStateChanged(auth, async (user) => {
       if (!isMounted) return;
-      
-      // Đánh dấu auth đã được khởi tạo
-      if (!authInitialized.current) {
-        authInitialized.current = true;
-        console.log("Auth initialized");
-      }
       
       console.log("=== AUTH STATE CHANGED ===");
       console.log("User:", user?.uid || "null");
       console.log("Current pathname:", pathname);
       console.log("Has redirected:", hasRedirected.current);
+      console.log("Auth initialized:", authInitialized.current);
 
       try {
         if (!user) {
-          // Không có user đăng nhập
+          // No user logged in
           console.log("No user - clearing local auth state");
           await clearAuthState();
           
-          // Chỉ redirect nếu không ở public routes
+          // Only redirect if not on public routes and haven't redirected yet
           if (!publicRoutes.includes(pathname) && !hasRedirected.current) {
             hasRedirected.current = true;
             console.log("Redirecting to sign_in");
             router.replace("/sign_in");
           }
         } else {
-          // User đã đăng nhập
+          // User is logged in
           console.log("User authenticated:", user.uid);
           
-          // Lưu auth state
+          // Save auth state
           await saveAuthState({
             uid: user.uid,
             email: user.email,
           });
 
-          // Kiểm tra user profile
-          await checkUserProfile(user, pathname, router, hasRedirected, isMounted);
+          // Check user profile only after auth is fully initialized
+          if (!hasRedirected.current) {
+            await checkUserProfile(user, pathname, router, hasRedirected, isMounted);
+          }
         }
         
       } catch (error) {
         console.error("Error in auth state handler:", error);
         
-        // Nếu có lỗi, redirect về sign_in
+        // If error occurs and not on public route, redirect to sign_in
         if (!hasRedirected.current && !publicRoutes.includes(pathname)) {
           hasRedirected.current = true;
           console.log("Error occurred, redirecting to sign_in");
           router.replace("/sign_in");
         }
       } finally {
-        // QUAN TRỌNG: Set loading = false sau khi xử lý xong
-        if (isMounted && authInitialized.current) {
+        // Set loading to false after processing
+        if (isMounted) {
+          authInitialized.current = true;
           console.log("Setting loading to false");
           setIsLoading(false);
         }
@@ -92,17 +105,12 @@ export default function RootLayout() {
 
     return () => {
       isMounted = false;
-      unsubscribe();
+      if (authUnsubscribe.current) {
+        authUnsubscribe.current();
+        authUnsubscribe.current = null;
+      }
     };
-  }, []); // Chỉ chạy 1 lần khi component mount
-
-  // Reset redirect flag khi chuyển sang public routes
-  useEffect(() => {
-    if (publicRoutes.includes(pathname)) {
-      console.log("On public route, resetting redirect flag");
-      hasRedirected.current = false;
-    }
-  }, [pathname]);
+  }, []); // Only run once when component mounts
   
   useFocusEffect(
     React.useCallback(() => {
@@ -118,7 +126,7 @@ export default function RootLayout() {
           );
           return true;
         }
-        return false; // Cho phép back bình thường cho các screen khác
+        return false;
       };
 
       const backHandler = BackHandler.addEventListener(
@@ -129,7 +137,7 @@ export default function RootLayout() {
     }, [pathname])
   );
 
-  // Hiển thị loading khi fonts chưa load hoặc đang check auth
+  // Show loading when fonts not loaded or checking auth
   if (!loaded || isLoading) {
     console.log("Showing loading screen - loaded:", loaded, "isLoading:", isLoading);
     return (
@@ -161,6 +169,10 @@ export default function RootLayout() {
         <Stack.Screen name="sign_in" />
         <Stack.Screen name="sign_up" />
         <Stack.Screen name="form_profile" />
+        <Stack.Screen name="search" />
+        <Stack.Screen name="profile" />
+        <Stack.Screen name="change_pass" />
+        <Stack.Screen name="forget_pass" />
       </Stack>
       {tabRoutes.includes(pathname.replace('/', '')) && <BottomNavigation />}
       <StatusBar style="auto" />
@@ -168,7 +180,7 @@ export default function RootLayout() {
   );
 }
 
-// Helper function để check user profile
+// Helper function to check user profile
 async function checkUserProfile(
   user: any,
   pathname: string,
@@ -215,10 +227,10 @@ async function checkUserProfile(
       router.replace("/home");
     }
     
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error checking user profile:", error);
     
-    if (error.code === 'permission-denied') {
+    if (error instanceof Error && 'code' in error && (error as any).code === 'permission-denied') {
       console.log("Permission denied - redirect to form_profile");
       if (pathname !== "/form_profile") {
         hasRedirected.current = true;
