@@ -82,8 +82,9 @@ export default function SignIn(){
                 visibilityTime: 2000, 
             });
             
-            // Don't manually redirect - let _layout.tsx handle it based on auth state
-            console.log("Sign in completed, waiting for auth state change...");
+            // Check user profile and redirect accordingly
+            console.log("Checking user profile after sign in...");
+            await checkUserProfileAndRedirect(user);
             
         } catch (error) {
             console.error("Sign in error:", error);
@@ -91,6 +92,47 @@ export default function SignIn(){
             Alert.alert('Lỗi', errorMessage);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const checkUserProfileAndRedirect = async (user: any) => {
+        try {
+            console.log("Checking user profile for redirect...");
+            
+            const userDocRef = doc(db, "users", user.uid);
+            const userDoc = await getDoc(userDocRef);
+            
+            if (!userDoc.exists()) {
+                console.log("No user document - redirecting to form_profile");
+                router.replace("/form_profile");
+                return;
+            }
+
+            const data = userDoc.data();
+            const requiredFields = ['username', 'fullname', 'numberphone', 'birthday'];
+            const missingFields = requiredFields.filter(field => !data?.[field]);
+            
+            if (missingFields.length > 0) {
+                console.log("Missing profile fields - redirecting to form_profile");
+                router.replace("/form_profile");
+                return;
+            }
+
+            // Profile complete - redirect to home
+            console.log("Profile complete - redirecting to home");
+            router.replace("/home");
+            
+        } catch (error) {
+            console.error("Error checking user profile:", error);
+            
+            if (error instanceof Error && 'code' in error && (error as any).code === 'permission-denied') {
+                console.log("Permission denied - redirecting to form_profile");
+                router.replace("/form_profile");
+            } else {
+                // On error, default to home
+                console.log("Error occurred, defaulting to home");
+                router.replace("/home");
+            }
         }
     };
 

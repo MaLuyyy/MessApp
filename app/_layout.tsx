@@ -22,17 +22,20 @@ export default function RootLayout() {
   });
   
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const publicRoutes = ["/sign_in", "/sign_up", "/forget_pass"];
   const hasRedirected = useRef(false);
   const authInitialized = useRef(false);
   const authUnsubscribe = useRef<(() => void) | null>(null);
+  const isProcessingAuth = useRef(false);
 
-  // Reset redirect flag when changing routes
+  // Reset redirect flag when changing to public routes
   useEffect(() => {
     console.log("Route changed to:", pathname);
     if (publicRoutes.includes(pathname)) {
       console.log("On public route, resetting redirect flag");
       hasRedirected.current = false;
+      setCurrentUser(null); // Clear current user when on public routes
     }
   }, [pathname]);
 
@@ -48,7 +51,9 @@ export default function RootLayout() {
     
     // Setup Firebase auth state listener
     authUnsubscribe.current = onAuthStateChanged(auth, async (user) => {
-      if (!isMounted) return;
+      if (!isMounted || isProcessingAuth.current) return;
+      
+      isProcessingAuth.current = true;
       
       console.log("=== AUTH STATE CHANGED ===");
       console.log("User:", user?.uid || "null");
@@ -60,9 +65,10 @@ export default function RootLayout() {
         if (!user) {
           // No user logged in
           console.log("No user - clearing local auth state");
+          setCurrentUser(null);
           await clearAuthState();
           
-          // Only redirect if not on public routes and haven't redirected yet
+          // Only redirect if not already on public routes and haven't redirected yet
           if (!publicRoutes.includes(pathname) && !hasRedirected.current) {
             hasRedirected.current = true;
             console.log("Redirecting to sign_in");
@@ -71,6 +77,7 @@ export default function RootLayout() {
         } else {
           // User is logged in
           console.log("User authenticated:", user.uid);
+          setCurrentUser(user);
           
           // Save auth state
           await saveAuthState({
@@ -78,14 +85,16 @@ export default function RootLayout() {
             email: user.email,
           });
 
-          // Check user profile only after auth is fully initialized
-          if (!hasRedirected.current) {
+          // Only process profile check if we haven't redirected and not on sign_in screen
+          // (sign_in screen will handle its own redirect after successful login)
+          if (!hasRedirected.current && pathname !== "/sign_in") {
             await checkUserProfile(user, pathname, router, hasRedirected, isMounted);
           }
         }
         
       } catch (error) {
         console.error("Error in auth state handler:", error);
+        setCurrentUser(null);
         
         // If error occurs and not on public route, redirect to sign_in
         if (!hasRedirected.current && !publicRoutes.includes(pathname)) {
@@ -99,12 +108,14 @@ export default function RootLayout() {
           authInitialized.current = true;
           console.log("Setting loading to false");
           setIsLoading(false);
+          isProcessingAuth.current = false;
         }
       }
     });
 
     return () => {
       isMounted = false;
+      isProcessingAuth.current = false;
       if (authUnsubscribe.current) {
         authUnsubscribe.current();
         authUnsubscribe.current = null;
@@ -147,7 +158,7 @@ export default function RootLayout() {
     );
   }
 
-  console.log("Rendering main app - pathname:", pathname);
+  console.log("Rendering main app - pathname:", pathname, "user:", currentUser?.uid || "none");
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
@@ -196,7 +207,7 @@ async function checkUserProfile(
     const userDocRef = doc(db, "users", user.uid);
     const userDoc = await getDoc(userDocRef);
     
-    if (!isMounted) return;
+    if (!isMounted || hasRedirected.current) return;
 
     if (!userDoc.exists()) {
       console.log("No user document - redirect to form_profile");
@@ -221,10 +232,17 @@ async function checkUserProfile(
     }
 
     // Profile complete - redirect to home if needed
-    if (pathname === "/" || pathname === "/sign_in" || pathname === "/sign_up") {
-      console.log("Profile complete - redirect to home");
+    const needsRedirectToHome = pathname === "/" || 
+                               pathname === "/sign_in" || 
+                               pathname === "/sign_up" ||
+                               pathname === "/forget_pass";
+                               
+    if (needsRedirectToHome) {
+      console.log("Profile complete - redirect to home from", pathname);
       hasRedirected.current = true;
       router.replace("/home");
+    } else {
+      console.log("Profile complete - user already on correct screen:", pathname);
     }
     
   } catch (error) {
