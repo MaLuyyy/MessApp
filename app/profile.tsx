@@ -73,7 +73,7 @@ export default function ProfileScreen(){
     return(
         <View style={styles.container}>
           <View style={styles.header}>
-              <Ionicons name="arrow-back" size={24} onPress={() => router.back()} />
+              <Ionicons name="arrow-back" size={24} color={'#0000FF'} onPress={() => router.back()} />
               <Text style={styles.headerTitle}>Thông tin cá nhân</Text>
           </View>
             {/* Avatar + Info */}

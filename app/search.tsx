@@ -4,17 +4,21 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { collection, getDocs } from "firebase/firestore";
 import { useCallback, useState } from "react";
 import { StyleSheet, TextInput, View, FlatList, Text, Image, TouchableOpacity } from "react-native";
+import { getAuth } from "firebase/auth";
 
 export default function SearchScreen() {
   const router = useRouter();
   const [searchText, setSearchText] = useState("");
   const [users, setUsers] = useState<any[]>([]);
 
+  const auth = getAuth();
+  const currentUser = auth.currentUser; // user đang đăng nhập
+
   useFocusEffect(
     useCallback(() => {
       const fetchUsers = async () => {
-        if (searchText.trim() === "") {
-            setUsers([]); // clear list khi chưa nhập gì
+        if (searchText.trim().length < 5) {
+            setUsers([]);
             return;
           }
         const snapshot = await getDocs(collection(db, "users"));
@@ -23,13 +27,17 @@ export default function SearchScreen() {
           ...doc.data(),
         })) as any[];
 
+        if (currentUser) {
+          data = data.filter((u) => u.userId !== currentUser.uid);
+        }
+
         // lọc theo số điện thoại hoặc tên
         if (searchText.trim() !== "") {
           const keyword = searchText.trim().toLowerCase();
           data = data.filter(
             (u) =>
               u.numberphone?.toLowerCase().includes(keyword) ||
-              u.username?.toLowerCase().includes(keyword)
+              u.username?.toLowerCase() === keyword
           );
         }
 
@@ -47,12 +55,13 @@ export default function SearchScreen() {
         <Ionicons
           name="arrow-back-outline"
           size={24}
+          color={'#0000FF'}
           onPress={() => router.back()}
         />
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={20} color="#aaa" />
           <TextInput
-            placeholder="Tìm kiếm"
+            placeholder="Nhập số điện thoại hoặc username "
             style={styles.searchInput}
             value={searchText}
             onChangeText={setSearchText}
@@ -67,15 +76,19 @@ export default function SearchScreen() {
             keyExtractor={(item) => item.userId}
             contentContainerStyle={{ paddingHorizontal: 15 }}
             renderItem={({ item }) => (
-            <TouchableOpacity style={styles.userItem}>
+            <TouchableOpacity 
+              style={styles.userItem}
+              onPress={() => router.push({
+                pathname: "/chat/[userId]",
+                params: { userId: item.userId, fullname: item.fullname }
+              })} >
                 <Image
-                source={{ uri: "https://placekitten.com/200/200" }} // ảnh tạm
+                source={{ uri: "https://placekitten.com/200/200" }}
                 style={styles.avatar}
                 />
                 <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.fullname}</Text>
-                <Text style={styles.sub}>{item.numberphone}</Text>
-                <Text style={styles.sub}>{item.email}</Text>
+                <Text style={styles.sub}>@{item.username}</Text>
                 </View>
             </TouchableOpacity>
             )}
@@ -111,13 +124,14 @@ const styles = StyleSheet.create({
     height: 40,
   },
   searchInput: {
+    paddingTop: 12,
     marginLeft: 10,
-    fontSize: 16,
+    fontSize: 15,
     flex: 1,
   },
   header: {
-    flexDirection: "row", // nằm ngang
-    alignItems: "center", // căn giữa theo chiều dọc
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     marginTop: -7,
   },
