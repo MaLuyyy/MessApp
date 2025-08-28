@@ -1,30 +1,10 @@
+// components/MessageInput.tsx
 import { Ionicons } from "@expo/vector-icons";
-import { useState, useEffect } from "react";
-import { View, TextInput, StyleSheet, TouchableOpacity, Keyboard } from "react-native";
+import { useState } from "react";
+import { StyleSheet, TextInput, TouchableOpacity, View } from "react-native";
 
-export default function MessageInput() {
+export default function MessageInput({ bottomPadding = 25 }: { bottomPadding?: number }) {
   const [text, setText] = useState("");
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
-
-  useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener(
-      'keyboardDidShow',
-      () => {
-        setKeyboardVisible(true);
-      }
-    );
-    const keyboardDidHideListener = Keyboard.addListener(
-      'keyboardDidHide',
-      () => {
-        setKeyboardVisible(false);
-      }
-    );
-
-    return () => {
-      keyboardDidHideListener?.remove();
-      keyboardDidShowListener?.remove();
-    };
-  }, []);
 
   const handleSend = () => {
     if (text.trim() === "") return;
@@ -33,12 +13,7 @@ export default function MessageInput() {
   };
 
   return (
-    <View style={[
-      styles.container,
-      {
-        paddingBottom: keyboardVisible ? 5 : 25
-      }
-    ]}>
+    <View style={[styles.container, { paddingBottom: bottomPadding }]}>
       {/* Icon bên trái */}
       <View style={styles.leftIcons}>
         <TouchableOpacity>
@@ -65,7 +40,6 @@ export default function MessageInput() {
         <TouchableOpacity>
           <Ionicons name="happy" size={24} color="#1a73e8" />
         </TouchableOpacity>
-
         {text.trim() === "" ? (
           <TouchableOpacity>
             <Ionicons name="thumbs-up" size={24} color="#1a73e8" />
@@ -86,7 +60,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 8,
     paddingVertical: 10,
-    backgroundColor: "#fff",
+    alignSelf: 'flex-end',
   },
   leftIcons: {
     flexDirection: "row",
