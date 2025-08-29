@@ -2,14 +2,33 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { StyleSheet, TextInput, TouchableOpacity, View } from "react-native";
+import { auth, db } from "@/lib/firebaseConfig";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { useLocalSearchParams } from "expo-router";
 
-export default function MessageInput({ bottomPadding = 25 }: { bottomPadding?: number }) {
+
+export default function MessageInput({ bottomPadding = 35,  currentUserId = auth.currentUser?.uid}: { bottomPadding?: number ; currentUserId?: string }) {
   const [text, setText] = useState("");
+  const { userID } = useLocalSearchParams(); 
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (text.trim() === "") return;
-    console.log("Đã gửi:", text);
-    setText("");
+
+    try {
+      // tạo chatId cố định theo 2 user
+      const chatId = [currentUserId, userID].sort().join("_");
+
+      await addDoc(collection(db, "chats", chatId, "messages"), {
+        type: "text",
+        text,
+        senderId: currentUserId,
+        createdAt: serverTimestamp(),
+      });
+
+      setText("");
+    } catch (error) {
+      console.error("Lỗi gửi tin nhắn:", error);
+    }
   };
 
   return (
