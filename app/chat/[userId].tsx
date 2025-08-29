@@ -33,19 +33,46 @@ export default function ChatScreen() {
   }, []);
 
   useEffect(() => {
-    const chatId = [currentUserId, userID].sort().join("_");
+    if (!currentUserId || !userID) {
+      console.log("Missing user IDs:", { currentUserId, userID });
+      return;
+    }
+
+    // Đảm bảo cả hai ID đều là string và tạo chatId nhất quán
+    const chatId = [currentUserId, userID as string].sort().join("_");
+    
+    console.log("Setting up message listener:", {
+      chatId,
+      currentUserId, 
+      userID,
+      chatPath: `chats/${chatId}/messages`
+    });
 
     const q = query(
       collection(db, "chats", chatId, "messages"),
       orderBy("createdAt", "asc")
     );
 
-    const unsub = onSnapshot(q, (snapshot) => {
-      setMessages(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    });
+    const unsub = onSnapshot(q, 
+      (snapshot) => {
+        const newMessages = snapshot.docs.map((doc) => ({ 
+          id: doc.id, 
+          ...doc.data() 
+        }));
+        
+        console.log(`Received ${newMessages.length} messages for chat ${chatId}`);
+        setMessages(newMessages);
+      },
+      (error) => {
+        console.error("Error listening to messages:", error);
+      }
+    );
 
-    return () => unsub();
-  }, [userID]);
+    return () => {
+      console.log("Cleaning up message listener for chat:", chatId);
+      unsub();
+    };
+  }, [currentUserId, userID]);
 
   const renderMessage = ({ item }: { item: any }) => {
     const isMe = item.senderId === currentUserId;
@@ -69,6 +96,14 @@ export default function ChatScreen() {
     return null;
   };
 
+  useEffect(() => {
+    console.log("Chat Screen Debug:", {
+      currentUserId,
+      userID,
+      chatId: currentUserId && userID ? [currentUserId, userID as string].sort().join("_") : "N/A",
+      messagesCount: messages.length
+    });
+  }, [currentUserId, userID, messages.length]);
 
   return (
     <SafeAreaView style={styles.container}>

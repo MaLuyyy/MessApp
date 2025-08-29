@@ -7,20 +7,28 @@ import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { useLocalSearchParams } from "expo-router";
 
 
-export default function MessageInput({ bottomPadding = 35,  currentUserId = auth.currentUser?.uid}: { bottomPadding?: number ; currentUserId?: string }) {
+export default function MessageInput({ bottomPadding = 35}: { bottomPadding?: number}) {
   const [text, setText] = useState("");
   const { userID } = useLocalSearchParams(); 
+  const currentUserId = auth.currentUser?.uid;
 
   const handleSend = async () => {
     if (text.trim() === "") return;
 
     try {
       // tạo chatId cố định theo 2 user
-      const chatId = [currentUserId, userID].sort().join("_");
+      const chatId = [currentUserId, userID as string].sort().join("_");
+
+      console.log("Sending message:", {
+        chatId,
+        currentUserId,
+        userID,
+        text: text.trim()
+      });
 
       await addDoc(collection(db, "chats", chatId, "messages"), {
         type: "text",
-        text,
+        text: text.trim(),
         senderId: currentUserId,
         createdAt: serverTimestamp(),
       });
