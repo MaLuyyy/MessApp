@@ -3,40 +3,38 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { StyleSheet, TextInput, TouchableOpacity, View } from "react-native";
 import { auth, db } from "@/lib/firebaseConfig";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { useLocalSearchParams } from "expo-router";
 
-
-export default function MessageInput({ bottomPadding = 35}: { bottomPadding?: number}) {
+export default function MessageInput({ bottomPadding = 35 }: { bottomPadding?: number }) {
   const [text, setText] = useState("");
-  const { userID } = useLocalSearchParams(); 
+  const { userId } = useLocalSearchParams(); 
   const currentUserId = auth.currentUser?.uid;
 
   const handleSend = async () => {
-    if (text.trim() === "") return;
-
-    try {
-      // tạo chatId cố định theo 2 user
-      const chatId = [currentUserId, userID as string].sort().join("_");
-
-      console.log("Sending message:", {
-        chatId,
-        currentUserId,
-        userID,
-        text: text.trim()
-      });
-
-      await addDoc(collection(db, "chats", chatId, "messages"), {
-        type: "text",
-        text: text.trim(),
-        senderId: currentUserId,
-        createdAt: serverTimestamp(),
-      });
-
-      setText("");
-    } catch (error) {
-      console.error("Lỗi gửi tin nhắn:", error);
-    }
+    if (!text.trim()) return;
+  
+    const currentUserId = auth.currentUser?.uid;
+    if (!currentUserId) return;
+  
+    const chatId = [currentUserId, userId].sort().join("_");
+  
+    // 1. Thêm tin nhắn vào messages
+    await addDoc(collection(db, "chats", chatId, "messages"), {
+      senderId: currentUserId,
+      text,
+      type: "text",
+      createdAt: serverTimestamp(),
+    });
+  
+    // 2. Update chat metadata
+    await setDoc(doc(db, "chats", chatId), {
+      participants: [currentUserId, userId],
+      lastMessage: text,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  
+    setText("");
   };
 
   return (

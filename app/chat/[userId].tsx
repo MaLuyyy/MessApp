@@ -2,23 +2,24 @@
 import MessageInput from "@/components/MessageInput";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Keyboard, SafeAreaView, StyleSheet, Text, TouchableWithoutFeedback, View, Image, FlatList } from "react-native";
 import { auth, db } from "@/lib/firebaseConfig";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 
 export default function ChatScreen() {
   const router = useRouter();
-  const { fullname, userID } = useLocalSearchParams();
+  const { fullname, userId } = useLocalSearchParams();
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const currentUserId = auth.currentUser?.uid;
   const [messages, setMessages] = useState<any[]>([]);
+  const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     const show = Keyboard.addListener("keyboardDidShow", (e) => {
       setKeyboardVisible(true);
-      setKeyboardHeight(e.endCoordinates.height); // lấy chiều cao bàn phím
+      setKeyboardHeight(e.endCoordinates.height);
     });
   
     const hide = Keyboard.addListener("keyboardDidHide", () => {
@@ -33,62 +34,98 @@ export default function ChatScreen() {
   }, []);
 
   useEffect(() => {
-    if (!currentUserId || !userID) {
-      console.log("Missing user IDs:", { currentUserId, userID });
+    if (!currentUserId || !userId) {
+      console.log("Missing user IDs:", { 
+        currentUserId, 
+        userId: userId,
+        authUser: auth.currentUser?.uid 
+      });
       return;
     }
 
-    // Đảm bảo cả hai ID đều là string và tạo chatId nhất quán
-    const chatId = [currentUserId, userID as string].sort().join("_");
+    // currentUserId = người đang đăng nhập, userId = người kia trong cuộc trò chuyện
+    const otherUserId = userId as string;
+    const chatId = [currentUserId, otherUserId].sort().join("_");
     
-    console.log("Setting up message listener:", {
-      chatId,
-      currentUserId, 
-      userID,
-      chatPath: `chats/${chatId}/messages`
-    });
+    console.log("=== SETTING UP CHAT LISTENER ===");
+    console.log("Current user (logged in):", currentUserId);
+    console.log("Other user (chat partner):", otherUserId);
+    console.log("Chat ID:", chatId);
+    console.log("Chat path:", `chats/${chatId}/messages`);
+    console.log("================================");
 
     const q = query(
       collection(db, "chats", chatId, "messages"),
-      orderBy("createdAt", "asc")
+      orderBy("createdAt", "desc") // ✅ Đổi từ "asc" thành "desc" để tin nhắn mới nhất ở đầu
     );
 
     const unsub = onSnapshot(q, 
       (snapshot) => {
-        const newMessages = snapshot.docs.map((doc) => ({ 
-          id: doc.id, 
-          ...doc.data() 
-        }));
+        const newMessages = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          console.log("Message data:", {
+            id: doc.id,
+            senderId: data.senderId,
+            text: data.text,
+            type: data.type,
+            createdAt: data.createdAt
+          });
+          return { 
+            id: doc.id, 
+            ...data 
+          };
+        });
         
-        console.log(`Received ${newMessages.length} messages for chat ${chatId}`);
+        console.log(`📨 Received ${newMessages.length} messages for chat ${chatId}`);
         setMessages(newMessages);
+        // Không cần scroll nữa vì inverted sẽ tự động hiển thị tin nhắn mới ở đầu
       },
       (error) => {
-        console.error("Error listening to messages:", error);
+        console.error("❌ Error listening to messages:", error);
       }
     );
 
     return () => {
-      console.log("Cleaning up message listener for chat:", chatId);
+      console.log("🧹 Cleaning up message listener for chat:", chatId);
       unsub();
     };
-  }, [currentUserId, userID]);
+  }, [currentUserId, userId]);
 
-  const renderMessage = ({ item }: { item: any }) => {
+  // Không cần scroll functions nữa vì dùng inverted
+
+  const renderMessage = ({ item, index }: { item: any; index: number }) => {
     const isMe = item.senderId === currentUserId;
 
     if (item.type === "text") {
       return (
-        <View style={[styles.message, isMe ? styles.myMessage : styles.theirMessage]}>
+        <View style={[
+          styles.message, 
+          isMe ? styles.myMessage : styles.theirMessage
+        ]}>
           <Text style={{ color: isMe ? "#fff" : "#000" }}>{item.text}</Text>
+          <Text style={[
+            styles.messageTime, 
+            { color: isMe ? "rgba(255,255,255,0.7)" : "#999" }
+          ]}>
+            {formatTime(item.createdAt)}
+          </Text>
         </View>
       );
     }
 
     if (item.type === "image") {
       return (
-        <View style={[styles.message, isMe ? styles.myMessage : styles.theirMessage]}>
-          <Image source={{ uri: item.imageUrl }} style={{ width: 200, height: 200, borderRadius: 10 }} />
+        <View style={[
+          styles.message, 
+          isMe ? styles.myMessage : styles.theirMessage
+        ]}>
+          <Image source={{ uri: item.imageUrl }} style={styles.messageImage} />
+          <Text style={[
+            styles.messageTime, 
+            { color: isMe ? "rgba(255,255,255,0.7)" : "#999" }
+          ]}>
+            {formatTime(item.createdAt)}
+          </Text>
         </View>
       );
     }
@@ -96,14 +133,25 @@ export default function ChatScreen() {
     return null;
   };
 
+  const formatTime = (timestamp: any) => {
+    if (!timestamp) return "";
+    
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleTimeString('vi-VN', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
+  // Debug: hiển thị thông tin chat
   useEffect(() => {
     console.log("Chat Screen Debug:", {
       currentUserId,
-      userID,
-      chatId: currentUserId && userID ? [currentUserId, userID as string].sort().join("_") : "N/A",
+      userId,
+      chatId: currentUserId && userId ? [currentUserId, userId as string].sort().join("_") : "N/A",
       messagesCount: messages.length
     });
-  }, [currentUserId, userID, messages.length]);
+  }, [currentUserId, userId, messages.length]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -124,16 +172,23 @@ export default function ChatScreen() {
           <Ionicons name="videocam" size={24} color="#0000FF" />
         </View>
       </View>
+      
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <FlatList
+        <FlatList
+          ref={flatListRef}
           data={messages}
           renderItem={renderMessage}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 10 }}
+          contentContainerStyle={{ 
+            padding: 10,
+          }}
+          inverted={true} // ✅ Quan trọng: Hiển thị từ cuối lên đầu
+          showsVerticalScrollIndicator={false}
         />
       </TouchableWithoutFeedback>
+      
       <View style={[styles.chatWrapper, {marginBottom: keyboardVisible ? keyboardHeight : 0}]} >     
-        <MessageInput/>
+        <MessageInput />
       </View>
     </SafeAreaView>
   );
@@ -162,22 +217,32 @@ const styles = StyleSheet.create({
   },
   chatWrapper: {
     backgroundColor: '#fff',
- 
   },
   message: {
     maxWidth: "70%",
-    padding: 10,
-    marginVertical: 5,
+    padding: 12,
+    marginVertical: 2,
     borderRadius: 15,
   },
   myMessage: {
     backgroundColor: "#1a73e8",
     alignSelf: "flex-end",
-    borderTopRightRadius: 0,
+    borderTopRightRadius: 4,
   },
   theirMessage: {
     backgroundColor: "#eee",
     alignSelf: "flex-start",
-    borderTopLeftRadius: 0,
+    borderTopLeftRadius: 4,
+  },
+  messageTime: {
+    fontSize: 11,
+    marginTop: 4,
+    alignSelf: "flex-end",
+  },
+  messageImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 10,
+    marginBottom: 4,
   },
 });
