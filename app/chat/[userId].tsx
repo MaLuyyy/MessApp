@@ -2,19 +2,20 @@
 import MessageInput from "@/components/MessageInput";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState, useRef } from "react";
-import { Keyboard, SafeAreaView, StyleSheet, Text, TouchableWithoutFeedback, View, Image, FlatList } from "react-native";
+import React, { useEffect, useState, useRef } from "react";
+import { Keyboard, SafeAreaView, StyleSheet, Text, TouchableWithoutFeedback, View, Image, FlatList, TouchableOpacity } from "react-native";
 import { auth, db } from "@/lib/firebaseConfig";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { addListener } from "@/lib/listenerManager";
-
+import AudioPlayer from "@/components/AudioPlayer";
 
 interface Message {
   id: string;
   senderId: string;
   text?: string;
-  type: "text" | "image";
+  type: "text" | "image"| "audio";
   imageUrl?: string;
+  audioUrl?: string;
   createdAt: any; // Firestore timestamp
 }
 
@@ -154,7 +155,7 @@ export default function ChatScreen() {
       return (
         <View style={[
           styles.message, 
-          isMe ? styles.myMessage : styles.theirMessage
+          isMe ? styles.myImage : styles.theirImage
         ]}>
           <Image source={{ uri: item.imageUrl }} style={styles.messageImage} />
           <Text style={[
@@ -166,6 +167,29 @@ export default function ChatScreen() {
         </View>
       );
     }
+    if (item.type === "audio") {
+      return (
+        <View
+          style={[
+            styles.message,
+            isMe ? styles.myMessage : styles.theirMessage,
+            { flexDirection: "row", alignItems: "center", gap: 8 }
+          ]}
+        >
+          <AudioPlayer uri={item.audioUrl} />
+          <Text style={{ color: isMe ? "#fff" : "#000" }}></Text>
+          <Text
+            style={[
+              styles.messageTime,
+              { color: isMe ? "rgba(255,255,255,0.7)" : "#999" }
+            ]}
+          >
+            {formatTime(item.createdAt)}
+          </Text>
+        </View>
+      );
+    }
+    
   
     return null;
   };
@@ -225,6 +249,7 @@ export default function ChatScreen() {
           data={messages}
           renderItem={renderMessage}
           keyExtractor={(item) => item.id}
+          style={{backgroundColor: '#fff'}}
           contentContainerStyle={{ 
             padding: 10,
           }}
@@ -233,7 +258,7 @@ export default function ChatScreen() {
         />
       </TouchableWithoutFeedback>
       
-      <View style={[styles.chatWrapper, {marginBottom: keyboardVisible ? keyboardHeight : 0}]} >     
+      <View style={[styles.chatWrapper, {marginBottom: keyboardVisible ? keyboardHeight : 0 }]} >     
         <MessageInput />
       </View>
     </SafeAreaView>
@@ -280,6 +305,16 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     borderTopLeftRadius: 4,
   },
+  myImage: {
+    //backgroundColor: "#1a73e8",
+    alignSelf: "flex-end",
+    borderTopRightRadius: 4,
+  },
+  theirImage: {
+    //backgroundColor: "#eee",
+    alignSelf: "flex-start",
+    borderTopLeftRadius: 4,
+  },
   messageTime: {
     fontSize: 11,
     marginTop: 4,
@@ -297,11 +332,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 10,
-    backgroundColor: "#eee",
+    //backgroundColor: "#eee",
   },
   dateText: {
     fontSize: 12,
-    color: "#666",
+    color: "#333",
     fontWeight: "500",
   },
   

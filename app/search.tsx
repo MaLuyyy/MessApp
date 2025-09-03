@@ -83,7 +83,7 @@ export default function SearchScreen() {
                 params: { userId: item.userId, fullname: item.fullname }
               })} >
                 <Image
-                source={{ uri: "https://placekitten.com/200/200" }}
+                source={{ uri: item.photoURL || "https://graph.facebook.com/4/picture?type=large" }}
                 style={styles.avatar}
                 />
                 <View style={{ flex: 1 }}>

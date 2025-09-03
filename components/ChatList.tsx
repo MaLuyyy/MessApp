@@ -110,7 +110,7 @@ export default function ChatList() {
               lastMessage: lastMessageData.type === "text" 
                 ? lastMessageData.text 
                 : lastMessageData.type === "image" 
-                  ? "📷 Hình ảnh" 
+                  ? "Đã gửi một ảnh" 
                   : "Tin nhắn",
               lastMessageTime: lastMessageData.createdAt,
               lastMessageType: lastMessageData.type,

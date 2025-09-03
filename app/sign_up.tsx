@@ -38,6 +38,7 @@ export default function CreateAccountScreen() {
         // ✅ Lưu họ tên vào Firestore theo uid
         await setDoc(doc(db, 'users', user.uid), {
           email: email,
+          photoURL: "https://graph.facebook.com/4/picture?type=large",
           createdAt: new Date(),
         });
         Toast.show({

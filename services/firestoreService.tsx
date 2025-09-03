@@ -10,7 +10,7 @@ const getToken = async () => {
   const user = auth.currentUser;
   if (!user) throw new Error("Chưa đăng nhập");
   const token = await user.getIdToken();
-  console.log("🔑 Firebase ID Token:", token); // 👈 In ra token sau khi vào app
+  console.log("🔑 Firebase ID Token:", token.substring(0,20) + "..."); // 👈 In ra token sau khi vào app
   return token;
 };
 
@@ -34,6 +34,20 @@ const parseDocument = (doc: any) => {
   };
 };
 
+// Helper convert JS value to Firestore format
+const convertToFirestoreValue = (value: any) => {
+  if (typeof value === "number") {
+    return Number.isInteger(value) 
+      ? { integerValue: value } 
+      : { doubleValue: value };
+  }
+  if (typeof value === "boolean") return { booleanValue: value };
+  if (value instanceof Date) return { timestampValue: value.toISOString() };
+  if (value === null) return { nullValue: null };
+  return { stringValue: String(value) };
+};
+
+
 // Lấy single document theo ID
 export const getDocument = async (collectionName: string, docId: string) => {
   const token = await getToken();
@@ -41,9 +55,7 @@ export const getDocument = async (collectionName: string, docId: string) => {
   try {
     const res = await axios.get(`${baseUrl}/${collectionName}/${docId}`, {
       headers: { Authorization: `Bearer ${token}` },
-    });
-
-    console.log(`✅ Got document ${docId} from ${collectionName}`);
+    }); 
     return parseDocument(res.data);
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 404) {
@@ -93,10 +105,7 @@ export const queryDocuments = async (
         fieldFilter: {
           field: { fieldPath: field },
           op: operator.toUpperCase(),
-          value: typeof value === 'string' ? { stringValue: value } : 
-                 typeof value === 'number' ? { integerValue: value } : 
-                 typeof value === 'boolean' ? { booleanValue: value } : 
-                 { stringValue: value }
+          value: convertToFirestoreValue(value)
         }
       }
     }
@@ -120,12 +129,7 @@ export const addDocument = async (collectionName: string, data: any, docId?: str
   const token = await getToken();
 
   const fields = Object.fromEntries(
-    Object.entries(data).map(([k, v]) => {
-      if (typeof v === "number") return [k, { integerValue: v }];
-      if (typeof v === "boolean") return [k, { booleanValue: v }];
-      if (v instanceof Date) return [k, { timestampValue: v.toISOString() }];
-      return [k, { stringValue: String(v) }];
-    })
+    Object.entries(data).map(([k, v]) => [k, convertToFirestoreValue(v)])
   );
 
   const url = docId 
@@ -144,28 +148,36 @@ export const addDocument = async (collectionName: string, data: any, docId?: str
 };
 
 // Cập nhật document
-export const updateDocument = async (collectionName: string, id: string, data: any) => {
+export const updateDocument = async (collectionName: string, id: string, data: any, merge: boolean = true) => {
   const token = await getToken();
 
   const fields = Object.fromEntries(
-    Object.entries(data).map(([k, v]) => {
-      if (typeof v === "number") return [k, { integerValue: v }];
-      if (typeof v === "boolean") return [k, { booleanValue: v }];
-      if (v instanceof Date) return [k, { timestampValue: v.toISOString() }];
-      return [k, { stringValue: String(v) }];
-    })
+    Object.entries(data).map(([k, v]) => [k, convertToFirestoreValue(v)])
   );
 
-  const fieldPaths = Object.keys(data).join(',');
-  
-  const res = await axios.patch(
-    `${baseUrl}/${collectionName}/${id}?updateMask.fieldPaths=${fieldPaths}`,
-    { fields },
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
+  if (merge) {
+    // Patch request for partial update
+    const fieldPaths = Object.keys(data).map(key => `updateMask.fieldPaths=${key}`).join('&');
+    
+    const res = await axios.patch(
+      `${baseUrl}/${collectionName}/${id}?${fieldPaths}`,
+      { fields },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
 
-  console.log("✅ Document updated:", id);
-  return parseDocument(res.data);
+    console.log("✅ Document updated (merge):", id);
+    return parseDocument(res.data);
+  } else {
+    // PUT request for full replacement
+    const res = await axios.patch(
+      `${baseUrl}/${collectionName}/${id}`,
+      { fields },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    console.log("✅ Document replaced:", id);
+    return parseDocument(res.data);
+  }
 };
 
 // Xóa document
@@ -183,4 +195,35 @@ export const getCurrentUserData = async () => {
   if (!currentUser) throw new Error("Chưa đăng nhập");
   
   return await getDocument('users', currentUser.uid);
+};
+
+// Update current user data
+export const updateCurrentUserData = async (data: any) => {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Chưa đăng nhập");
+  
+  // Add updatedAt timestamp
+  const updateData = {
+    ...data,
+    updatedAt: new Date()
+  };
+  
+  return await updateDocument('users', currentUser.uid, updateData, true);
+};
+
+// Update user avatar specifically
+export const updateUserAvatar = async (photoURL: string) => {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Chưa đăng nhập");
+  
+  console.log("🖼️ Updating user avatar...");
+  
+  const updateData = {
+    photoURL,
+    updatedAt: new Date()
+  };
+  
+  const result = await updateDocument('users', currentUser.uid, updateData, true);
+  console.log("✅ Avatar updated successfully");
+  return result;
 };
