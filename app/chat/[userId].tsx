@@ -8,6 +8,22 @@ import { auth, db } from "@/lib/firebaseConfig";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { addListener } from "@/lib/listenerManager";
 
+
+interface Message {
+  id: string;
+  senderId: string;
+  text?: string;
+  type: "text" | "image";
+  imageUrl?: string;
+  createdAt: any; // Firestore timestamp
+}
+
+interface DateSeparator {
+  id: string;
+  type: "date";
+  label: string;
+}
+
 export default function ChatScreen() {
   const router = useRouter();
   const { fullname, userId } = useLocalSearchParams();
@@ -33,7 +49,7 @@ export default function ChatScreen() {
       hide.remove();
     };
   }, []);
-
+  
   useEffect(() => {
     if (!currentUserId || !userId) {
       console.log("Missing user IDs:", { 
@@ -44,42 +60,27 @@ export default function ChatScreen() {
       return;
     }
 
-    // currentUserId = người đang đăng nhập, userId = người kia trong cuộc trò chuyện
     const otherUserId = userId as string;
     const chatId = [currentUserId, otherUserId].sort().join("_");
-    
-    console.log("=== SETTING UP CHAT LISTENER ===");
-    console.log("Current user (logged in):", currentUserId);
-    console.log("Other user (chat partner):", otherUserId);
-    console.log("Chat ID:", chatId);
-    console.log("Chat path:", `chats/${chatId}/messages`);
-    console.log("================================");
+
+    type ChatItem = Message | DateSeparator;
 
     const q = query(
       collection(db, "chats", chatId, "messages"),
       orderBy("createdAt", "desc") // ✅ Đổi từ "asc" thành "desc" để tin nhắn mới nhất ở đầu
     );
 
-    const unsubscribe = onSnapshot(q, 
+    const unsubscribe = onSnapshot(
+      q,
       (snapshot) => {
-        const newMessages = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          console.log("Message data:", {
-            id: doc.id,
-            senderId: data.senderId,
-            text: data.text,
-            type: data.type,
-            createdAt: data.createdAt
-          });
-          return { 
-            id: doc.id, 
-            ...data 
-          };
-        });
-        
-        console.log(`📨 Received ${newMessages.length} messages for chat ${chatId}`);
-        setMessages(newMessages);
-        // Không cần scroll nữa vì inverted sẽ tự động hiển thị tin nhắn mới ở đầu
+        const rawMessages = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        // 🔹 Group theo ngày
+        const grouped = groupMessagesWithDates(rawMessages);
+        setMessages(grouped);
       },
       (error) => {
         console.error("❌ Error listening to messages:", error);
@@ -88,16 +89,50 @@ export default function ChatScreen() {
     addListener(unsubscribe);
 
     return () => {
-      console.log("🧹 Cleaning up message listener for chat:", chatId);
       unsubscribe();
     };
   }, [currentUserId, userId]);
 
-  // Không cần scroll functions nữa vì dùng inverted
+ // 🔹 Group messages theo ngày
+ const groupMessagesWithDates = (rawMessages: any[]) => {
+  const grouped: any[] = [];
+  let lastDate: string | null = null;
 
-  const renderMessage = ({ item, index }: { item: any; index: number }) => {
+  const sortedMessages = [...rawMessages].reverse();
+
+  sortedMessages.forEach((msg) => {
+    const date = msg.createdAt?.toDate
+      ? msg.createdAt.toDate()
+      : new Date(msg.createdAt);
+
+    const dateStr = date.toDateString();
+
+    if (dateStr !== lastDate) {
+      grouped.push({
+        id: `date-${dateStr}`,
+        type: "date",
+        label: formatDateLabel(date),
+      });
+      lastDate = dateStr;
+    }
+
+    grouped.push(msg);
+  });
+
+  return grouped.reverse();
+};
+
+  const renderMessage = ({ item }: { item: any }) => {
+    if (item.type === "date") {
+      return (
+        <View style={styles.dateSeparator}>
+          <Text style={styles.dateText}>{item.label}</Text>
+        </View>
+      );
+    }
+  
     const isMe = item.senderId === currentUserId;
-
+  
     if (item.type === "text") {
       return (
         <View style={[
@@ -114,7 +149,7 @@ export default function ChatScreen() {
         </View>
       );
     }
-
+  
     if (item.type === "image") {
       return (
         <View style={[
@@ -131,29 +166,38 @@ export default function ChatScreen() {
         </View>
       );
     }
-
+  
     return null;
   };
+  
+  // 🔹 Format ngày giống Messenger
+  const formatDateLabel = (date: Date) => {
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
 
-  const formatTime = (timestamp: any) => {
-    if (!timestamp) return "";
-    
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleTimeString('vi-VN', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    if (date.toDateString() === today.toDateString()) {
+      return "Hôm nay";
+    }
+    if (date.toDateString() === yesterday.toDateString()) {
+      return "Hôm qua";
+    }
+    return date.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
     });
   };
 
-  // Debug: hiển thị thông tin chat
-  useEffect(() => {
-    console.log("Chat Screen Debug:", {
-      currentUserId,
-      userId,
-      chatId: currentUserId && userId ? [currentUserId, userId as string].sort().join("_") : "N/A",
-      messagesCount: messages.length
+  // 🔹 Format giờ
+  const formatTime = (timestamp: any) => {
+    if (!timestamp) return "";
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleTimeString("vi-VN", {
+      hour: "2-digit",
+      minute: "2-digit",
     });
-  }, [currentUserId, userId, messages.length]);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -247,4 +291,18 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 4,
   },
+  dateSeparator: {
+    alignSelf: "center",
+    marginVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: "#eee",
+  },
+  dateText: {
+    fontSize: 12,
+    color: "#666",
+    fontWeight: "500",
+  },
+  
 });
