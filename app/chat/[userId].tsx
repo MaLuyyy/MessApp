@@ -150,6 +150,16 @@ export default function ChatScreen() {
         </View>
       );
     }
+    if (item.type === "icon") {
+      return (
+        <View style={[
+          styles.message, 
+          isMe ? styles.myIcon : styles.theirIcon
+        ]}>
+          <Text style={{ fontSize: 30 ,color: isMe ? "#fff" : "#000" }}>{item.icon}</Text>
+        </View>
+      );
+    }
   
     if (item.type === "image") {
       return (
@@ -311,6 +321,16 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 4,
   },
   theirImage: {
+    //backgroundColor: "#eee",
+    alignSelf: "flex-start",
+    borderTopLeftRadius: 4,
+  },
+  myIcon: {
+    //backgroundColor: "#1a73e8",
+    alignSelf: "flex-end",
+    borderTopRightRadius: 4,
+  },
+  theirIcon: {
     //backgroundColor: "#eee",
     alignSelf: "flex-start",
     borderTopLeftRadius: 4,

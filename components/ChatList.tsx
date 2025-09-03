@@ -23,6 +23,28 @@ export default function ChatList() {
   const [loading, setLoading] = useState(true);
   const currentUserId = auth.currentUser?.uid;
 
+
+  const getLastMessagePreview = (lastMessageData: any) => {
+    switch (lastMessageData.type) {
+      case "text":
+        return lastMessageData.text;
+      case "image":
+        return "📷 Đã gửi một ảnh";
+      case "audio":
+        return "🎤 Đã gửi một đoạn ghi âm";
+      case "icon":
+        return `${lastMessageData.icon}`;
+      case "video":
+        return "🎥 Đã gửi một video";
+      case "file":
+        return "📎 Đã gửi một tệp";
+      default:
+        return "Tin nhắn";
+    }
+  };
+
+  
+
   useEffect(() => {
     if (!currentUserId) {
       console.log("No current user for chat list");
@@ -107,11 +129,7 @@ export default function ChatList() {
               otherUserId,
               otherUserName: otherUserData?.fullname || otherUserData?.username || "Unknown User",
               otherUserAvatar: otherUserData?.photoURL,
-              lastMessage: lastMessageData.type === "text" 
-                ? lastMessageData.text 
-                : lastMessageData.type === "image" 
-                  ? "Đã gửi một ảnh" 
-                  : "Tin nhắn",
+              lastMessage: getLastMessagePreview(lastMessageData),
               lastMessageTime: lastMessageData.createdAt,
               lastMessageType: lastMessageData.type,
               isRead: lastMessageData.senderId === currentUserId || lastMessageData.isRead === true,
@@ -157,7 +175,6 @@ export default function ChatList() {
     <TouchableOpacity 
       style={styles.chatItem}
       onPress={() => {
-        console.log("📱 Opening chat with:", item.otherUserName);
         router.push({
           pathname: "/chat/[userId]",
           params: { 
