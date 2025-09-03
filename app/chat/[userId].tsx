@@ -6,6 +6,7 @@ import { useEffect, useState, useRef } from "react";
 import { Keyboard, SafeAreaView, StyleSheet, Text, TouchableWithoutFeedback, View, Image, FlatList } from "react-native";
 import { auth, db } from "@/lib/firebaseConfig";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+import { addListener } from "@/lib/listenerManager";
 
 export default function ChatScreen() {
   const router = useRouter();
@@ -59,7 +60,7 @@ export default function ChatScreen() {
       orderBy("createdAt", "desc") // ✅ Đổi từ "asc" thành "desc" để tin nhắn mới nhất ở đầu
     );
 
-    const unsub = onSnapshot(q, 
+    const unsubscribe = onSnapshot(q, 
       (snapshot) => {
         const newMessages = snapshot.docs.map((doc) => {
           const data = doc.data();
@@ -84,10 +85,11 @@ export default function ChatScreen() {
         console.error("❌ Error listening to messages:", error);
       }
     );
+    addListener(unsubscribe);
 
     return () => {
       console.log("🧹 Cleaning up message listener for chat:", chatId);
-      unsub();
+      unsubscribe();
     };
   }, [currentUserId, userId]);
 

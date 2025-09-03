@@ -50,7 +50,7 @@ export default function HomeScreen(){
                 ) : (
                     <View style={styles.comingSoon}>
                         <Text style={styles.comingSoonText}>Tính năng cuộc gọi</Text>
-                        <Text style={styles.comingSoonSubText}>Sắp ra mắt...</Text>
+                        <Text style={styles.comingSoonSubText}></Text>
                     </View>
                 )}
             </View>

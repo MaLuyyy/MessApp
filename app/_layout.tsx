@@ -31,9 +31,7 @@ export default function RootLayout() {
 
   // Reset redirect flag when changing to public routes
   useEffect(() => {
-    console.log("Route changed to:", pathname);
     if (publicRoutes.includes(pathname)) {
-      console.log("On public route, resetting redirect flag");
       hasRedirected.current = false;
       setCurrentUser(null); // Clear current user when on public routes
     }
@@ -41,8 +39,6 @@ export default function RootLayout() {
 
   useEffect(() => {
     let isMounted = true;
-    
-    console.log("=== SETTING UP AUTH LISTENER ===");
     
     // Clear any existing listener
     if (authUnsubscribe.current) {
@@ -57,9 +53,7 @@ export default function RootLayout() {
       
       console.log("=== AUTH STATE CHANGED ===");
       console.log("User:", user?.uid || "null");
-      console.log("Current pathname:", pathname);
-      console.log("Has redirected:", hasRedirected.current);
-      console.log("Auth initialized:", authInitialized.current);
+
 
       try {
         if (!user) {
@@ -84,9 +78,6 @@ export default function RootLayout() {
             uid: user.uid,
             email: user.email,
           });
-
-          // Only process profile check if we haven't redirected and not on sign_in screen
-          // (sign_in screen will handle its own redirect after successful login)
           if (!hasRedirected.current && pathname !== "/sign_in") {
             await checkUserProfile(user, pathname, router, hasRedirected, isMounted);
           }
@@ -99,7 +90,6 @@ export default function RootLayout() {
         // If error occurs and not on public route, redirect to sign_in
         if (!hasRedirected.current && !publicRoutes.includes(pathname)) {
           hasRedirected.current = true;
-          console.log("Error occurred, redirecting to sign_in");
           router.replace("/sign_in");
         }
       } finally {
@@ -150,7 +140,6 @@ export default function RootLayout() {
 
   // Show loading when fonts not loaded or checking auth
   if (!loaded || isLoading) {
-    console.log("Showing loading screen - loaded:", loaded, "isLoading:", isLoading);
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" />
@@ -158,7 +147,6 @@ export default function RootLayout() {
     );
   }
 
-  console.log("Rendering main app - pathname:", pathname, "user:", currentUser?.uid || "none");
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
@@ -202,7 +190,6 @@ async function checkUserProfile(
   if (!isMounted || hasRedirected.current) return;
 
   try {
-    console.log("Checking user profile for:", user.uid);
     
     const userDocRef = doc(db, "users", user.uid);
     const userDoc = await getDoc(userDocRef);
@@ -238,11 +225,10 @@ async function checkUserProfile(
                                pathname === "/forget_pass";
                                
     if (needsRedirectToHome) {
-      console.log("Profile complete - redirect to home from", pathname);
       hasRedirected.current = true;
       router.replace("/home");
     } else {
-      console.log("Profile complete - user already on correct screen:", pathname);
+
     }
     
   } catch (error) {

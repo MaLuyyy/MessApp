@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { auth } from './firebaseConfig';
 import { signOut } from 'firebase/auth';
+import { clearListeners } from "./listenerManager";
 
 // Keys để lưu trạng thái đăng nhập
 const AUTH_STATE_KEY = 'userAuthState';
@@ -117,62 +118,15 @@ export const updateLastLoginTime = async () => {
 
 // Đăng xuất hoàn toàn - với retry mechanism
 export const performLogout = async () => {
-  console.log('=== STARTING LOGOUT PROCESS ===');
-  
   try {
-    // Step 1: Clear local state first
-    console.log('Step 1: Clearing local auth state...');
+    clearListeners(); // ⬅️ hủy toàn bộ onSnapshot
+    await signOut(auth);
     await clearAuthState();
-    
-    // Step 2: Sign out from Firebase with retry
-    console.log('Step 2: Signing out from Firebase...');
-    let retryCount = 0;
-    const maxRetries = 3;
-    
-    while (retryCount < maxRetries) {
-      try {
-        await signOut(auth);
-        console.log('Firebase signOut successful');
-        break;
-      } catch (firebaseError) {
-        retryCount++;
-        const errorMessage = firebaseError instanceof Error ? firebaseError.message : 'Unknown error';
-        console.error(`Firebase signOut attempt ${retryCount} failed:`, errorMessage);
-        
-        if (retryCount >= maxRetries) {
-          console.error('Max retries reached for Firebase signOut');
-          // Continue with logout process even if Firebase signOut fails
-          break;
-        }
-        
-        // Wait before retry
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    }
-    
-    // Step 3: Wait a bit for auth state to propagate
-    console.log('Step 3: Waiting for auth state to propagate...');
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    console.log('=== LOGOUT COMPLETED SUCCESSFULLY ===');
-    console.log('Current auth state after logout:', auth.currentUser?.uid || 'null');
-    
   } catch (error) {
-    console.error('Error during logout process:', error);
-    
-    // Even if there's an error, make sure local state is cleared
-    try {
-      await clearAuthState();
-      console.log('Local state cleared despite error');
-    } catch (clearError) {
-      console.error('Failed to clear local state:', clearError);
-    }
-    
-    // Don't throw the error - allow the logout process to complete
-    console.log('Logout process completed with errors, but continuing...');
+    console.error('Logout error:', error);
+    await clearAuthState(); // Vẫn clear dù có lỗi
   }
 };
-
 // Force logout - for emergency situations
 export const forceLogout = async () => {
   console.log('=== FORCE LOGOUT ===');

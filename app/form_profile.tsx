@@ -1,6 +1,6 @@
 import InputField from "@/components/InputField";
 import { useRouter } from "expo-router";
-import { doc, setDoc } from "firebase/firestore";
+import { collection, doc, getDocs, query, setDoc, where } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { Alert, SafeAreaView, StyleSheet, Text, TouchableOpacity } from "react-native";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
@@ -72,11 +72,40 @@ export default function FormInfoScreen(){
 
             setLoading(true);
 
-            try {
-                // Tạm thời skip check duplicate để test
-                // TODO: Implement proper duplicate check later
-                console.log("Skipping duplicate check for now...");
+             // 🔍 Kiểm tra username có bị trùng không
+            const usernameQuery = query(
+                collection(db, "users"),
+                where("username", "==", username)
+            );
+            const usernameSnapshot = await getDocs(usernameQuery);
 
+            if (!usernameSnapshot.empty) {
+                const existsOther = usernameSnapshot.docs.some(doc => doc.id !== user.uid);
+                if (existsOther) {
+                    Alert.alert("Lỗi", "Tên người dùng đã được sử dụng");
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            // 🔍 Kiểm tra số điện thoại có bị trùng không
+            const phoneQuery = query(
+                collection(db, "users"),
+                where("numberphone", "==", numberphone)
+            );
+            const phoneSnapshot = await getDocs(phoneQuery);
+
+            if (!phoneSnapshot.empty) {
+                const existsOther = phoneSnapshot.docs.some(doc => doc.id !== user.uid);
+                if (existsOther) {
+                    Alert.alert("Lỗi", "Số điện thoại đã được sử dụng");
+                    setLoading(false);
+                    return;
+                }
+            }
+
+
+            try {
                 // Lưu thông tin với merge: true để giữ lại data cũ
                 console.log("Saving user profile...");
                 await setDoc(doc(db, "users", user.uid), {

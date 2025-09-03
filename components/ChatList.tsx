@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { collection, doc, getDoc, onSnapshot, orderBy, query } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { addListener } from "@/lib/listenerManager";
 
 interface ChatItem {
   chatId: string;
@@ -27,8 +28,6 @@ export default function ChatList() {
       console.log("No current user for chat list");
       return;
     }
-
-    console.log("🔍 Setting up chat list listener for user:", currentUserId);
     
     // Lắng nghe tất cả các collection chats
     const chatsRef = collection(db, "chats");
@@ -56,7 +55,6 @@ export default function ChatList() {
           return b.lastMessageTime.seconds - a.lastMessageTime.seconds;
         });
 
-        console.log(`📋 Found ${validChats.length} chats for current user`);
         setChats(validChats);
         
       } catch (error) {
@@ -65,6 +63,7 @@ export default function ChatList() {
         setLoading(false);
       }
     });
+    addListener(unsubscribe);
 
     return () => {
       console.log("🧹 Cleaning up chat list listener");
@@ -296,7 +295,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#000",
   },
-  unreadDot: {
+    unreadDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
