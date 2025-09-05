@@ -1,13 +1,29 @@
-// app/chat/[userID].tsx
+// app/chat/[userID].tsx - FIXED VERSION
 import MessageInput from "@/components/MessageInput";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState, useRef } from "react";
-import { Keyboard, SafeAreaView, StyleSheet, Text, TouchableWithoutFeedback, View, Image, FlatList, TouchableOpacity } from "react-native";
+import { 
+  Keyboard, 
+  SafeAreaView, 
+  StyleSheet, 
+  Text, 
+  TouchableWithoutFeedback, 
+  View, 
+  Image, 
+  FlatList, 
+  TouchableOpacity,
+  Alert,
+  Modal 
+} from "react-native";
 import { auth, db } from "@/lib/firebaseConfig";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+import { collection, onSnapshot, orderBy, query, doc, getDoc } from "firebase/firestore";
 import { addListener } from "@/lib/listenerManager";
 import AudioPlayer from "@/components/AudioPlayer";
+import webrtcService, { CallData } from "@/services/webrtcService";
+import { Camera } from 'expo-camera';
+import { usePermissions } from "@/hooks/usePermissions";
+import { useCall } from "@/providers/CallProvider";
 
 interface Message {
   id: string;
@@ -33,6 +49,9 @@ export default function ChatScreen() {
   const currentUserId = auth.currentUser?.uid;
   const [messages, setMessages] = useState<any[]>([]);
   const flatListRef = useRef<FlatList>(null);
+
+  const { isInCall, startCall } = useCall();
+  const { requestCallPermissions } = usePermissions();
 
   useEffect(() => {
     const show = Keyboard.addListener("keyboardDidShow", (e) => {
@@ -93,6 +112,7 @@ export default function ChatScreen() {
       unsubscribe();
     };
   }, [currentUserId, userId]);
+
 
  // 🔹 Group messages theo ngày
  const groupMessagesWithDates = (rawMessages: any[]) => {
@@ -233,6 +253,31 @@ export default function ChatScreen() {
     });
   };
 
+  // Call functions
+  const getUserData = async (uid: string) => {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', uid));
+      if (userDoc.exists()) {
+        return userDoc.data();
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting user data:', error);
+      return null;
+    }
+  };
+
+    // handle call
+    const handleVoiceCall = () => {
+      if (!userId) return;
+      startCall(userId as string, "audio");
+    };
+  
+    const handleVideoCall = () => {
+      if (!userId) return;
+      startCall(userId as string, "video");
+    };
+  
   return (
     <SafeAreaView style={styles.container}>
       {/* Header cố định */}
@@ -248,8 +293,20 @@ export default function ChatScreen() {
         </View>
 
         <View style={{ flexDirection: "row", gap: 20, paddingRight: 20 }}>
-          <Ionicons name="call" size={24} color="#0000FF" />
-          <Ionicons name="videocam" size={24} color="#0000FF" />
+          <TouchableOpacity 
+            onPress={handleVoiceCall}
+            disabled={isInCall}
+            style={{ opacity: ( isInCall) ? 0.5 : 1 }}
+          >
+            <Ionicons name="call" size={24} color="#0000FF" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={handleVideoCall}
+            disabled={ isInCall}
+            style={{ opacity: (isInCall) ? 0.5 : 1 }}
+          >
+            <Ionicons name="videocam" size={24} color="#0000FF" />
+          </TouchableOpacity>
         </View>
       </View>
       
@@ -316,22 +373,18 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 4,
   },
   myImage: {
-    //backgroundColor: "#1a73e8",
     alignSelf: "flex-end",
     borderTopRightRadius: 4,
   },
   theirImage: {
-    //backgroundColor: "#eee",
     alignSelf: "flex-start",
     borderTopLeftRadius: 4,
   },
   myIcon: {
-    //backgroundColor: "#1a73e8",
     alignSelf: "flex-end",
     borderTopRightRadius: 4,
   },
   theirIcon: {
-    //backgroundColor: "#eee",
     alignSelf: "flex-start",
     borderTopLeftRadius: 4,
   },
@@ -352,12 +405,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 10,
-    //backgroundColor: "#eee",
   },
   dateText: {
     fontSize: 12,
     color: "#333",
     fontWeight: "500",
   },
-  
 });

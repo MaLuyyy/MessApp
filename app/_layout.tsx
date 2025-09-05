@@ -11,6 +11,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { ActivityIndicator, Alert, BackHandler, View } from 'react-native';
 import { StackAnimationTypes } from 'react-native-screens';
 import { clearAuthState, saveAuthState } from '@/lib/authState';
+import  CallProvider  from "@/providers/CallProvider";
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
@@ -149,33 +150,35 @@ export default function RootLayout() {
 
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack
-        screenOptions={({ route }: any) => {
-          const animation =
-            tabRoutes.includes(route.name) && route.params?.animation
-              ? (route.params.animation as StackAnimationTypes)
-              : 'none';
-      
-          return {
-            headerShown: false,
-            animation,
-          };
-        }}
-      >
-        <Stack.Screen name="home" />
-        <Stack.Screen name="settings"/>
-        <Stack.Screen name="sign_in" />
-        <Stack.Screen name="sign_up" />
-        <Stack.Screen name="form_profile" />
-        <Stack.Screen name="search" />
-        <Stack.Screen name="profile" />
-        <Stack.Screen name="change_pass" />
-        <Stack.Screen name="forget_pass" />
-      </Stack>
-      {tabRoutes.includes(pathname.replace('/', '')) && <BottomNavigation />}
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <CallProvider>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <Stack
+          screenOptions={({ route }: any) => {
+            const animation =
+              tabRoutes.includes(route.name) && route.params?.animation
+                ? (route.params.animation as StackAnimationTypes)
+                : 'none';
+        
+            return {
+              headerShown: false,
+              animation,
+            };
+          }}
+        >
+          <Stack.Screen name="home" />
+          <Stack.Screen name="settings"/>
+          <Stack.Screen name="sign_in" />
+          <Stack.Screen name="sign_up" />
+          <Stack.Screen name="form_profile" />
+          <Stack.Screen name="search" />
+          <Stack.Screen name="profile" />
+          <Stack.Screen name="change_pass" />
+          <Stack.Screen name="forget_pass" />
+        </Stack>
+        {tabRoutes.includes(pathname.replace('/', '')) && <BottomNavigation />}
+        <StatusBar style="auto" />
+      </ThemeProvider>
+    </CallProvider>
   );
 }
 

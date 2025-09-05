@@ -5,8 +5,8 @@
   "scripts": {
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint"
   },
@@ -21,7 +21,10 @@
     "expo": "~53.0.22",
     "expo-av": "^15.1.7",
     "expo-blur": "~14.1.5",
+    "expo-build-properties": "~0.14.8",
+    "expo-camera": "^16.1.11",
     "expo-constants": "~17.1.7",
+    "expo-dev-client": "~5.2.4",
     "expo-file-system": "^18.1.11",
     "expo-font": "~13.3.2",
     "expo-haptics": "~14.1.4",
@@ -41,6 +44,7 @@
     "react-native": "0.79.6",
     "react-native-actionsheet": "^2.4.2",
     "react-native-gesture-handler": "~2.24.0",
+    "react-native-incall-manager": "^4.2.1",
     "react-native-keyboard-aware-scroll-view": "^0.9.5",
     "react-native-modal-datetime-picker": "^18.0.0",
     "react-native-reanimated": "~3.17.4",
@@ -48,6 +52,7 @@
     "react-native-screens": "~4.11.1",
     "react-native-toast-message": "^2.3.3",
     "react-native-web": "~0.20.0",
+    "react-native-webrtc": "^124.0.6",
     "react-native-webview": "13.13.5"
   },
   "devDependencies": {
