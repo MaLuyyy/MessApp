@@ -174,6 +174,8 @@ export default function RootLayout() {
           <Stack.Screen name="profile" />
           <Stack.Screen name="change_pass" />
           <Stack.Screen name="forget_pass" />
+          <Stack.Screen name="call" />
+          <Stack.Screen name="chat"/>
         </Stack>
         {tabRoutes.includes(pathname.replace('/', '')) && <BottomNavigation />}
         <StatusBar style="auto" />

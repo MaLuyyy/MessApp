@@ -253,30 +253,30 @@ export default function ChatScreen() {
     });
   };
 
-  // Call functions
-  const getUserData = async (uid: string) => {
-    try {
-      const userDoc = await getDoc(doc(db, 'users', uid));
-      if (userDoc.exists()) {
-        return userDoc.data();
-      }
-      return null;
-    } catch (error) {
-      console.error('Error getting user data:', error);
-      return null;
+    // Call functions với permission check
+  const handleVoiceCall = async () => {
+    if (!userId || isInCall) return;
+    
+    const hasPermission = await requestCallPermissions(false);
+    if (!hasPermission) {
+      Alert.alert("Lỗi", "Cần quyền microphone để thực hiện cuộc gọi");
+      return;
     }
+
+    startCall(userId as string, "audio");
   };
 
-    // handle call
-    const handleVoiceCall = () => {
-      if (!userId) return;
-      startCall(userId as string, "audio");
-    };
-  
-    const handleVideoCall = () => {
-      if (!userId) return;
-      startCall(userId as string, "video");
-    };
+  const handleVideoCall = async () => {
+    if (!userId || isInCall) return;
+    
+    const hasPermission = await requestCallPermissions(true);
+    if (!hasPermission) {
+      Alert.alert("Lỗi", "Cần quyền camera và microphone để thực hiện video call");
+      return;
+    }
+
+    startCall(userId as string, "video");
+  };
   
   return (
     <SafeAreaView style={styles.container}>

@@ -3,7 +3,6 @@ import { Alert } from "react-native";
 import { auth, db } from "@/lib/firebaseConfig";
 import { webrtcService, CallData } from "@/services/webrtcService";
 import IncomingCallModal from "@/components/IncomingCallModal";
-import CallScreen from "@/components/CallScreen";
 import { doc, getDoc } from "firebase/firestore";
 import { useRouter } from "expo-router";
 
@@ -40,7 +39,7 @@ const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     webrtcService.onIncomingCall = async (callData) => {
       console.log("📞 Incoming call received:", callData);
 
-        // 🔎 Lấy info người gọi (caller) từ Firestore
+      // 🔎 Lấy info người gọi (caller) từ Firestore
       const callerSnap = await getDoc(doc(db, "users", callData.callerId));
       if (callerSnap.exists()) {
         callData.callerName = callerSnap.data().fullname;
@@ -55,7 +54,6 @@ const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         }
       }
     };
-      
 
     return () => {
       webrtcService.stopListeningForIncomingCalls();
@@ -67,7 +65,7 @@ const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       let callerName = "Người dùng";
       let calleeName = "Đang gọi...";
       let calleePhoto = "";
-  
+
       // Lấy tên caller
       if (currentUserId) {
         const snap = await getDoc(doc(db, "users", currentUserId));
@@ -82,27 +80,33 @@ const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         calleeName = calleeSnap.data().fullname;
         calleePhoto = calleeSnap.data().photoURL;
       }
-  
+
       const callData = await webrtcService.startCall(
         calleeId,
         currentUserId!,
         callerName,
         type
       );
-  
-      // 🟢 Lưu thêm callee info để UI hiển thị
-      setCurrentCall({
+
+      // 🟢 Lưu thông tin call và điều hướng
+      const fullCallData = {
         ...callData,
         calleeName,
         calleePhoto,
-      });
+      };
+
+      setCurrentCall(fullCallData);
       setIsInCall(true);
+
+      // 🚀 Điều hướng đến màn hình cuộc gọi
+      router.push(`/call/${callData.id}` as any);
+
     } catch (err) {
       Alert.alert("Lỗi", "Không thể bắt đầu cuộc gọi");
       console.error("❌ startCall error:", err);
     }
   };
-  
+
   const handleAcceptIncomingCall = async () => {
     if (!incomingCall) return;
     try {
@@ -112,6 +116,10 @@ const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       setCurrentCall(incomingCall);
       setIsInCall(true);
       setIncomingCall(null);
+
+      // 🚀 Điều hướng đến màn hình cuộc gọi khi chấp nhận
+      router.push(`/call/${incomingCall.id}` as any);
+
     } catch (err) {
       Alert.alert("Lỗi", "Không thể chấp nhận cuộc gọi");
       setIncomingCall(null);
@@ -135,20 +143,13 @@ const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     <CallContext.Provider value={{ isInCall, currentCall, startCall, endCall }}>
       {children}
 
+      {/* Chỉ hiển thị modal cuộc gọi đến, không render CallScreen */}
       {incomingCall && (
         <IncomingCallModal
           visible={true}
           callData={incomingCall}
           onAccept={handleAcceptIncomingCall}
           onReject={handleRejectIncomingCall}
-        />
-      )}
-
-      {isInCall && currentCall && (
-        <CallScreen
-          callData={currentCall}
-          isIncoming={currentCall.callerId !== currentUserId}
-          onEndCall={endCall}
         />
       )}
     </CallContext.Provider>
